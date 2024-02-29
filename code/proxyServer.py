@@ -1,6 +1,7 @@
 import socket
 from threading import Thread
 import sys
+import re
 
 HOST = '127.0.0.1'
 S_HOST = '127.0.0.1'
@@ -52,39 +53,53 @@ def validateMessage():
     return True
 
 
-def handleClient(proxySocket: socket.socket, serverSockets: list[socket.socket])
+def handleClient(proxySocket: socket.socket, serverList: list[socket.socket]):
     clientSocket, clientAddress = proxySocket.accept()
     with clientSocket as clientSock:
         clientAddress = clientAddress
         req = getRequest(clientSock)
-        sendMessage(serverSockets[0], req)
-        rsp = getResponse(serverSockets[0])
+        sendMessage(serverList[0], req)
+        rsp = getResponse(serverList[0])
         sendMessage(clientSock, rsp)
 
 
-def initServers(serverList: list[tuple[str, int]]) -> list[tuple[str, int]]:
+def initServersConnections(serverList: list[tuple[str, int]] =[]) -> list[tuple[str, int]]:
     continueAsking = True
     while continueAsking:
-        serverProps: str = input("Enter server's IP and port (i.e. 127.0.0.1, 12345): ")
-        serverProps: list[str] = serverProps.split(",")
-        serverList.append(serverProps)
+        serverProps = input("Enter server's IP and port (i.e. 127.0.0.1, 12345): ")
+        serverProps = checkServerProps(serverProps)
+        for host, port in serverProps:
+            serverList.append((host, int(port)))
+        serverProps = input("Add more servers? (Y/N)")
+        if "N" in serverProps or "n" in serverProps:
+            continueAsking = False
     
     return serverList
 
 
+def checkServerProps(serverProps: str) -> zip:
+    serverProps = "^" + serverProps
+    hosts = re.findall("[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}", serverProps)
+    for host in set(hosts):
+        serverProps = serverProps.replace(host, ".")
+    ports = re.findall("[^0-9][0-9]{1,5}", serverProps)
+    ports = [x[1:] for x in ports]
+    return zip(hosts, ports)
+
 
 def runProxy():
-    serverSockets = []
-    serverSockets.append(connectToServer(S_HOST, S_PORT))
+    serverList = initServersConnections()
+    print(serverList)
 
+    '''
     proxySocket = initProxy()
     proxySocket.listen(BACKLOG)
     print(f"Server listening on port {PORT}...")
 
     while True:
-        handleClient(proxySocket, serverSockets)
-        serverSockets.pop()
-        serverSockets.append(connectToServer(S_HOST, S_PORT))
+        handleClient(proxySocket, serverList)
+        serverList.pop()
+        serverList.append(connectToServer(S_HOST, S_PORT))'''
 
 def main():
     runProxy()
