@@ -66,7 +66,7 @@ def handleClient(proxySocket: socket.socket, serverList: list[socket.socket]):
 def initServersConnections(serverList: list[tuple[str, int]] =[]) -> list[tuple[str, int]]:
     continueAsking = True
     while continueAsking:
-        serverProps = input("Enter server's IP and port (i.e. 127.0.0.1, 12345): ")
+        serverProps = input("Enter 1 or more servers' IPs and ports (i.e. 127.0.0.1, 12345): ")
         serverProps = checkServerProps(serverProps)
         for host, port in serverProps:
             serverList.append((host, int(port)))
@@ -89,7 +89,6 @@ def checkServerProps(serverProps: str) -> zip:
 
 def runProxy():
     serverList = initServersConnections()
-    print(serverList)
 
     '''
     proxySocket = initProxy()
