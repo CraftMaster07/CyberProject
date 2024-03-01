@@ -12,15 +12,74 @@ BACKLOG = 10
 
 
 class Server:
-    def __init__(self, host, port):
+    def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
-    
+        self.Socket = None
+
+
     def connectToServer(self):
-        newServerSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        newServerSocket.connect((self.host, self.port))
-        print("Connected to a server")
-        return newServerSocket
+        self.Socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.Socket.connect((self.host, self.port))
+        print(f"Connected to {self.host}")
+    
+
+    def closeConnection(self):
+        self.Socket.close()
+        print(f"Ended connection with server({self.host})")
+
+
+    def validateMessage(self):
+        return True
+
+
+    def sendMessage(self, msg: bytes) -> bool:
+        if not self.validateMessage():
+            return False
+        self.Socket.send(msg)
+        return True
+
+
+    def reciveAnswer(self) -> bytes:
+        answer = self.Socket.recv(BUFFER_SIZE)
+        print(f"Got response from server")
+        return answer
+
+
+    def handleRequest(self, request: bytes):
+        if not self.sendMessage(request):
+            return 'Error'
+        rsp = self.reciveAnswer()
+        return rsp
+
+
+class Client:
+    def __init__(self, host: str, port: int, Socket: socket.socket):
+        self.host = host
+        self.port = port
+        self.Socket = Socket
+
+
+    def closeConnection(self):
+        self.Socket.close()
+        print(f"Ended connection with client({self.host})")
+
+
+    def validateMessage(self):
+        return True
+
+
+    def reciveRequest(self) -> bytes:
+        answer = self.Socket.recv(BUFFER_SIZE)
+        print(f"Got request from client")
+        return answer
+
+
+    def sendResponse(self, msg: bytes) -> bool:
+        if not self.validateMessage():
+            return False
+        self.Socket.send(msg)
+        return True
 
 
 def initProxy():
@@ -31,50 +90,47 @@ def initProxy():
     return proxySocket
 
 
-def sendMessage(dSock, request):
-    if not validateMessage():
-        return False
+def sendMessage(dSock: socket.socket, request: bytes):
     dSock.send(request)
-    return True
 
 
-def getRequest(clientSocket):
+def getRequest(clientSocket: socket.socket) -> bytes:
     request = clientSocket.recv(BUFFER_SIZE)
     print(f"Got request from client")
     return request
 
-def getResponse(serverSocket):
-    response = serverSocket.recv(BUFFER_SIZE)
-    print(f"Got response from server")
-    return response
 
-
-def validateMessage():
-    return True
-
-
-def handleClient(proxySocket: socket.socket, serverList: list[socket.socket]):
+def handleClient(proxySocket: socket.socket, currentServer: Server):
     clientSocket, clientAddress = proxySocket.accept()
-    with clientSocket as clientSock:
-        clientAddress = clientAddress
-        req = getRequest(clientSock)
-        sendMessage(serverList[0], req)
-        rsp = getResponse(serverList[0])
-        sendMessage(clientSock, rsp)
+    newClient = Client(*clientAddress, clientSocket)
+    currentServer.connectToServer()
+
+    req = newClient.reciveRequest()
+    rsp = currentServer.handleRequest(req)
+    newClient.sendResponse(rsp)
+    newClient.closeConnection()
+
+    currentServer.closeConnection()
 
 
-def initServersConnections(serverList: list[tuple[str, int]] =[]) -> list[tuple[str, int]]:
+def initServers(serverList: list[Server] =[]) -> list[Server]:
     continueAsking = True
     while continueAsking:
         serverProps = input("Enter 1 or more servers' IPs and ports (i.e. 127.0.0.1, 12345): ")
         serverProps = checkServerProps(serverProps)
         for host, port in serverProps:
-            serverList.append((host, int(port)))
+            server = Server(host, int(port))
+            serverList.append(server)
         serverProps = input("Add more servers? (Y/N)")
         if "N" in serverProps or "n" in serverProps:
             continueAsking = False
     
     return serverList
+
+
+def connectToServers(serverList: list[Server]):
+    for server in serverList:
+        server.connectToServer()
 
 
 def checkServerProps(serverProps: str) -> zip:
@@ -88,17 +144,20 @@ def checkServerProps(serverProps: str) -> zip:
 
 
 def runProxy():
-    serverList = initServersConnections()
-
-    '''
+    serverList = initServers()
+    try:
+        serverList[0]
+    except:
+        print("No servers were chosen, please try again")
+        serverList = initServers()
     proxySocket = initProxy()
+    
     proxySocket.listen(BACKLOG)
     print(f"Server listening on port {PORT}...")
 
     while True:
-        handleClient(proxySocket, serverList)
-        serverList.pop()
-        serverList.append(connectToServer(S_HOST, S_PORT))'''
+        currentServer = serverList[0]
+        handleClient(proxySocket, currentServer)
 
 def main():
     runProxy()
