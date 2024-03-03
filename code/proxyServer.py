@@ -1,7 +1,7 @@
 import socket
 from threading import Thread
-import sys
 import re
+import time
 
 HOST = '127.0.0.1'
 S_HOST = '127.0.0.1'
@@ -128,11 +128,6 @@ def initServers(serverList: list[Server] =[]) -> list[Server]:
     return serverList
 
 
-def connectToServers(serverList: list[Server]):
-    for server in serverList:
-        server.connectToServer()
-
-
 def checkServerProps(serverProps: str) -> zip:
     serverProps = "^" + serverProps
     hosts = re.findall("[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}", serverProps)
@@ -141,6 +136,27 @@ def checkServerProps(serverProps: str) -> zip:
     ports = re.findall("[^0-9][0-9]{1,5}", serverProps)
     ports = [x[1:] for x in ports]
     return zip(hosts, ports)
+
+
+def lookForClients(serverList: list[Server], proxySocket: socket.socket):
+    while True:
+        currentServer = serverList[0]
+        handleClient(proxySocket, currentServer)
+
+
+def interrupt():
+    while True:
+        seconds = input()
+        if checkInterrupt:
+            seconds = seconds[1:]
+            print(f"Sleeping... {seconds}sec")
+            time.sleep(int(seconds))
+            print("finished")
+
+
+def checkInterrupt(inpt: str) -> bool:
+    checkForTime = re.match("^s\d+$", inpt)
+    return bool(checkForTime)
 
 
 def runProxy():
@@ -155,9 +171,13 @@ def runProxy():
     proxySocket.listen(BACKLOG)
     print(f"Server listening on port {PORT}...")
 
-    while True:
-        currentServer = serverList[0]
-        handleClient(proxySocket, currentServer)
+    lookForClientsThread = Thread(target=lookForClients, args=(serverList, proxySocket,))
+    interruptThread = Thread(target=interrupt, args=lookForClients)
+
+    lookForClientsThread.start()
+    interruptThread.start()
+
+    
 
 def main():
     runProxy()
