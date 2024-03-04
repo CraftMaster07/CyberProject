@@ -4,9 +4,7 @@ import re
 import time
 
 HOST = '127.0.0.1'
-S_HOST = '127.0.0.1'
 PORT = 8080
-S_PORT = 25565
 BUFFER_SIZE = 1024
 BACKLOG = 10
 
@@ -172,7 +170,7 @@ def runProxy():
     print(f"Server listening on port {PORT}...")
 
     lookForClientsThread = Thread(target=lookForClients, args=(serverList, proxySocket,))
-    interruptThread = Thread(target=interrupt, args=lookForClients)
+    interruptThread = Thread(target=interrupt)
 
     lookForClientsThread.start()
     interruptThread.start()
