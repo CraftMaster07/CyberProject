@@ -16,10 +16,16 @@ class Server:
         self.Socket = None
 
 
-    def connectToServer(self):
+    def connectToServer(self) -> bool:
         self.Socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.Socket.connect((self.host, self.port))
-        print(f"Connected to {self.host}")
+        try:
+            self.Socket.connect((self.host, self.port))
+            print(f"Connected to {self.host}")
+            return True
+        except ConnectionRefusedError:
+            self.closeConnection()
+            print(f"** Server {self.host} crashed **")
+            return False
     
 
     def closeConnection(self):
@@ -34,7 +40,12 @@ class Server:
     def sendMessage(self, msg: bytes) -> bool:
         if not self.validateMessage():
             return False
-        self.Socket.send(msg)
+        try:
+            self.Socket.send(msg)
+        except ConnectionRefusedError:
+            self.closeConnection()
+            print(f"** Server {self.host} crashed **")
+            return False
         return True
 
 
@@ -98,10 +109,17 @@ def getRequest(clientSocket: socket.socket) -> bytes:
     return request
 
 
-def handleClient(proxySocket: socket.socket, currentServer: Server):
+def handleClient(proxySocket: socket.socket, serverList: list[Server]):
     clientSocket, clientAddress = proxySocket.accept()
     newClient = Client(*clientAddress, clientSocket)
-    currentServer.connectToServer()
+    
+    currentServer = chooseServer(serverList)
+    notFoundServer = True
+    while notFoundServer:
+        if currentServer.connectToServer():
+            notFoundServer = False
+        else:
+            serverList.remove(currentServer)
 
     req = newClient.reciveRequest()
     rsp = currentServer.handleRequest(req)
@@ -155,6 +173,10 @@ def interrupt():
 def checkInterrupt(inpt: str) -> bool:
     checkForTime = re.match("^s\d+$", inpt)
     return bool(checkForTime)
+
+
+def chooseServer(serverList: list[Server]) -> Server:
+    return serverList[0]
 
 
 def runProxy():

@@ -35,16 +35,6 @@ Content-Type: text/html
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Example Page</title>
     <link rel="stylesheet" href="styles.css">
-    <style>
-    body {
-    font-family: Arial, sans-serif;
-    background-color: #f0f0f0;
-    }
-
-    h1 {
-        color: blue;
-    }
-    </style>
 </head>
 <body>
     <h1>Hello, world!</h1>
@@ -62,7 +52,7 @@ body {
 }
 
 h1 {
-    color: blue;
+    color: green;
 }
 """
 
@@ -85,9 +75,8 @@ def handleRequest(clientSocket):
     print("Request:")
     print(request.split("\r\n"))
 
-    response = HTTP_WITH_CSS_RESPONSE
-    clientSocket.sendall(response.encode())
-    response = HTTP_WITH_CSS_RESPONSE2
+    with open("happybirthday/index.html",'r') as file:
+        response = file.read()
     clientSocket.sendall(response.encode())
     clientSocket.close()
 
