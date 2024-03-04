@@ -77,6 +77,7 @@ def handleRequest(clientSocket):
 
     with open("happybirthday/index.html",'r') as file:
         response = file.read()
+    print(response)
     clientSocket.sendall(response.encode())
     clientSocket.close()
 
