@@ -89,6 +89,7 @@ def handleRequest(clientSocket):
 
     with open(f"happybirthday/{reqFilePath}",'r') as file:
         response = file.read()
+
     response = (
         "HTTP/1.1 200 OK\r\n"
         "Content-Type: text/html\r\n\r\n"
