@@ -114,7 +114,6 @@ def handleRequest(clientSocket):
     response = (
         "HTTP/1.1 200 OK\r\n"
         f"Content-Type: {get_content_type_from_request(request)}\r\n\r\n"
-        f"Content-Length: {os.stat(f'code/happybirthday{reqFilePath}')}\r\n\r\n"
         f"{response}"
     )
     clientSocket.sendall(response.encode())
