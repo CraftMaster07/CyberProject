@@ -1,4 +1,5 @@
 import socket
+import select
 from threading import Thread
 import re
 import time
@@ -113,9 +114,9 @@ def handleClient(proxySocket: socket.socket, serverList: list[Server]):
     clientSocket, clientAddress = proxySocket.accept()
     newClient = Client(*clientAddress, clientSocket)
     
-    currentServer = chooseServer(serverList)
     notFoundServer = True
     while notFoundServer:
+        currentServer = chooseServer(serverList)
         if currentServer.connectToServer():
             notFoundServer = False
         else:
@@ -129,19 +130,18 @@ def handleClient(proxySocket: socket.socket, serverList: list[Server]):
     currentServer.closeConnection()
 
 
-def initServers(serverList: list[Server] =[]) -> list[Server]:
+def initServers(communicationList: dict[Server:list[Client]] = {}) -> list[Server]:
     continueAsking = True
     while continueAsking:
         serverProps = input("Enter 1 or more servers' IPs and ports (i.e. 127.0.0.1, 12345): ")
         serverProps = checkServerProps(serverProps)
         for host, port in serverProps:
             server = Server(host, int(port))
-            serverList.append(server)
+            communicationList[server] = []
         serverProps = input("Add more servers? (Y/N)")
-        if "N" in serverProps or "n" in serverProps:
-            continueAsking = False
+        continueAsking = bool(re.search("[Y,y]", serverProps))
     
-    return serverList
+    return communicationList
 
 
 def checkServerProps(serverProps: str) -> zip:
@@ -154,10 +154,16 @@ def checkServerProps(serverProps: str) -> zip:
     return zip(hosts, ports)
 
 
-def lookForClients(serverList: list[Server], proxySocket: socket.socket):
+def lookForClients(communicationList: dict[Server:list[Client]], proxySocket: socket.socket):
+    communicationList = dict()
     while True:
-        currentServer = serverList[0]
-        handleClient(proxySocket, currentServer)
+        currentServer = chooseServer(communicationList.keys())
+        readList, _, _ = select.select([proxySocket] + communicationList.keys() + [clientList[0] for clientList in communicationList.values()] ,[], [])
+        for sock in readList:
+            if sock is proxySocket:
+                getNewClient(communicationList, proxySocket, currentServer)
+            elif sock in communicationList:
+                rsp = sock.handleRequest()s
 
 
 def interrupt():
@@ -179,24 +185,28 @@ def chooseServer(serverList: list[Server]) -> Server:
     return serverList[0]
 
 
+def getNewClient(communicationList: dict[Server:list[Client]], proxySocket:socket.socket , chosenServer:Server):
+    clientSocket, clientAddress = proxySocket.accept()
+    newClient = Client(*clientAddress, clientSocket)
+
+    communicationList[chosenServer].append(newClient)
+
+
 def runProxy():
-    serverList = initServers()
-    try:
-        serverList[0]
-    except:
+    communicationList = initServers()
+    while not communicationList:
         print("No servers were chosen, please try again")
-        serverList = initServers()
+        communicationList = initServers()
     proxySocket = initProxy()
     
     proxySocket.listen(BACKLOG)
     print(f"Server listening on port {PORT}...")
 
-    lookForClientsThread = Thread(target=lookForClients, args=(serverList, proxySocket,))
+    lookForClientsThread = Thread(target=lookForClients, args=(communicationList, proxySocket,))
     interruptThread = Thread(target=interrupt)
 
     lookForClientsThread.start()
     interruptThread.start()
-
     
 
 def main():
