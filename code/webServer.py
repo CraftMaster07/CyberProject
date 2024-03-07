@@ -1,7 +1,7 @@
 import socket
 from threading import Thread
 import psutil
-import re
+import os
 
 S_HOST = '127.0.0.1'
 S_PORT = 8080
@@ -67,11 +67,28 @@ def initServer():
 
 
 def findSourceRequested(requestHeader: str) -> str: 
-    isRequestedFile = re.search(" (/[a-z,A-Z]*)+(\.[a-z,A-Z]*)?", requestHeader)
-    isRequestedFile = isRequestedFile.group()[1:]
+    isRequestedFile = requestHeader.split(" ")[1]
     if len(isRequestedFile) < 4:
         return "/index.html"
     return isRequestedFile
+
+
+def get_content_type_from_request(http_request):
+    # Split the HTTP request by lines
+    lines = http_request.split('\n')
+    
+    # Find the line containing 'Accept' header
+    accept_header = next((line for line in lines if line.startswith('Accept:')), None)
+    
+    if accept_header:
+        # Extract the requested content types
+        requested_content_types = accept_header.split(':')[1].strip().split(',')
+        
+        # Return the first requested content type
+        return requested_content_types[0].strip()
+        
+    # If no 'Accept' header found, default to plain text
+    return 'text/plain'
 
 
 def handleRequest(clientSocket):
@@ -84,15 +101,20 @@ def handleRequest(clientSocket):
 
     print("Request:")
     print(request)
-    request = request.split("\r\n")
-    reqFilePath = findSourceRequested(request[0])
+    requestt = request.split("\r\n")
+    reqFilePath = findSourceRequested(requestt[0])
 
-    with open(f"happybirthday/{reqFilePath}",'r') as file:
-        response = file.read()
+    try:
+        with open(f"code/happybirthday{reqFilePath}",'r') as file:
+            response = file.read()
+    except:
+        with open(f"code/happybirthday{reqFilePath}",'rb') as file:
+            response = file.read()
 
     response = (
         "HTTP/1.1 200 OK\r\n"
-        "Content-Type: text/html\r\n\r\n"
+        f"Content-Type: {get_content_type_from_request(request)}\r\n\r\n"
+        f"Content-Length: {os.stat(f'code/happybirthday{reqFilePath}')}\r\n\r\n"
         f"{response}"
     )
     clientSocket.sendall(response.encode())
