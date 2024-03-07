@@ -1,6 +1,7 @@
 import socket
 from threading import Thread
 import psutil
+import re
 
 S_HOST = '127.0.0.1'
 S_PORT = 8080
@@ -65,6 +66,14 @@ def initServer():
     return serverSocket
 
 
+def findSourceRequested(requestHeader: str) -> str: 
+    isRequestedFile = re.search(" (/[a-z,A-Z]*)+(\.[a-z,A-Z]*)?", requestHeader)
+    isRequestedFile = isRequestedFile.group()[1:]
+    if len(isRequestedFile) < 4:
+        return "/index.html"
+    return isRequestedFile
+
+
 def handleRequest(clientSocket):
     try:
         request = clientSocket.recv(BUFFER_SIZE).decode()
@@ -72,12 +81,19 @@ def handleRequest(clientSocket):
         clientSocket.close()
         return
     
-    print("Request:")
-    print(request.split("\r\n"))
 
-    with open("happybirthday/index.html",'r') as file:
+    print("Request:")
+    print(request)
+    request = request.split("\r\n")
+    reqFilePath = findSourceRequested(request[0])
+
+    with open(f"happybirthday/{reqFilePath}",'r') as file:
         response = file.read()
-    response = "HTTP/1.1 200\r\n" + response
+    response = (
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/html\r\n\r\n"
+        f"{response}"
+    )
     clientSocket.sendall(response.encode())
     clientSocket.close()
 
@@ -86,7 +102,6 @@ def runServer():
     serverSocket = initServer()
     serverSocket.listen(BACKLOG)
     print(f"Server listening on port {S_PORT}...")
-
     while True:
         clientSocket, clientAddress = serverSocket.accept()
         handleRequest(clientSocket)
