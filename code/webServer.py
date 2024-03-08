@@ -8,54 +8,7 @@ S_PORT = 8080
 BUFFER_SIZE = 1024
 BACKLOG = 10
 
-HTTP_RESPONSE = """\
-HTTP/1.1 200 OK
 
-<!DOCTYPE html>
-<html>
-<head>
-<title>Page Title</title>
-</head>
-<body>
-
-<h1>My First Heading</h1>
-<p>My first paragraph.</p>
-
-</body>
-</html>
-"""
-
-HTTP_WITH_CSS_RESPONSE = """\
-HTTP/1.1 200 OK
-Content-Type: text/html
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Example Page</title>
-    <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-    <h1>Hello, world!</h1>
-    <p>This is an example webpage.</p>
-</body>
-</html>"""
-
-HTTP_WITH_CSS_RESPONSE2 = """\
-HTTP/1.1 200 OK
-Content-Type: text/css
-
-body {
-    font-family: Arial, sans-serif;
-    background-color: #f0f0f0;
-}
-
-h1 {
-    color: green;
-}
-"""
 
 
 def initServer():
@@ -67,10 +20,10 @@ def initServer():
 
 
 def findSourceRequested(requestHeader: str) -> str: 
-    isRequestedFile = requestHeader.split(" ")[1]
-    if len(isRequestedFile) < 4:
+    RequestedFilePath = requestHeader.split(" ")[1]
+    if RequestedFilePath == '/':
         return "/index.html"
-    return isRequestedFile
+    return RequestedFilePath
 
 
 def get_content_type_from_request(http_request):
@@ -111,9 +64,14 @@ def handleRequest(clientSocket):
         with open(f"code/happybirthday{reqFilePath}",'rb') as file:
             response = file.read()
 
+    contentType = get_content_type_from_request(request)
+    if "image/avif" in contentType:
+        contentType = contentType[:-4] + reqFilePath.split(".")[1]
+        contentType += f"\r\nContent-Length: {len(response)}"
+
     response = (
         "HTTP/1.1 200 OK\r\n"
-        f"Content-Type: {get_content_type_from_request(request)}\r\n\r\n"
+        f"Content-Type: {contentType}\r\n\r\n"
         f"{response}"
     )
     clientSocket.sendall(response.encode())
