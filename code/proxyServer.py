@@ -2,7 +2,8 @@ import socket
 import select
 from threading import Thread
 import re
-import time
+import asyncio
+from worker import async_worker
 
 HOST = '127.0.0.1'
 PORT = 8080
@@ -50,9 +51,9 @@ class Server:
         print("Got response from server")
         return answer
 
-    def handleRequest(self, request: bytes):
+    def handleRequest(self, request: bytes) -> bytes:
         if not self.sendMessage(request):
-            return 'Error'
+            return b'Error'
         rsp = self.reciveAnswer()
         return rsp
 
@@ -159,21 +160,6 @@ def lookForClients(communicationList: dict[Server:list[Client]], proxySocket: so
                 rsp = sock.handleRequest()
 
 
-def interrupt():
-    while True:
-        seconds = input()
-        if checkInterrupt:
-            seconds = seconds[1:]
-            print(f"Sleeping... {seconds}sec")
-            time.sleep(int(seconds))
-            print("finished")
-
-
-def checkInterrupt(inpt: str) -> bool:
-    checkForTime = re.match("^s\d+$", inpt)
-    return bool(checkForTime)
-
-
 def chooseServer(serverList: list[Server]) -> Server:
     return serverList[0]
 
@@ -196,10 +182,14 @@ def runProxy():
     print(f"Server listening on port {PORT}...")
 
     lookForClientsThread = Thread(target=lookForClients, args=(communicationList, proxySocket,))
-    interruptThread = Thread(target=interrupt)
 
     lookForClientsThread.start()
-    interruptThread.start()
+
+
+def handleRequest(server: Server, client: Client):
+    request = client.reciveRequest()
+    server.handleRequest()
+    contin here
 
 
 def main():

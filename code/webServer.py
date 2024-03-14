@@ -1,7 +1,6 @@
 import socket
 from threading import Thread
 import psutil
-import os
 
 S_HOST = '127.0.0.1'
 S_PORT = 8080
@@ -24,7 +23,7 @@ def findSourceRequested(requestHeader: str) -> str:
     return RequestedFilePath
 
 
-def getContentType(request):
+def getContentType(request: str) -> str:
     request = request.split('\n')
     header = next((line for line in request if line.startswith('Accept:')), None)
     if header:
@@ -33,7 +32,7 @@ def getContentType(request):
     return 'text/plain'
 
 
-def handleRequest(clientSocket):
+def handleRequest(clientSocket: socket.socket):
     try:
         request = clientSocket.recv(BUFFER_SIZE).decode()
     except ConnectionResetError:
