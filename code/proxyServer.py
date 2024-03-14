@@ -16,7 +16,6 @@ class Server:
         self.port = port
         self.Socket = None
 
-
     def connectToServer(self) -> bool:
         self.Socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
@@ -27,16 +26,13 @@ class Server:
             self.closeConnection()
             print(f"** Server {self.host} crashed **")
             return False
-    
 
     def closeConnection(self):
         self.Socket.close()
         print(f"Ended connection with server({self.host})")
 
-
     def validateMessage(self):
         return True
-
 
     def sendMessage(self, msg: bytes) -> bool:
         if not self.validateMessage():
@@ -49,12 +45,10 @@ class Server:
             return False
         return True
 
-
     def reciveAnswer(self) -> bytes:
         answer = self.Socket.recv(BUFFER_SIZE)
-        print(f"Got response from server")
+        print("Got response from server")
         return answer
-
 
     def handleRequest(self, request: bytes):
         if not self.sendMessage(request):
@@ -69,21 +63,17 @@ class Client:
         self.port = port
         self.Socket = Socket
 
-
     def closeConnection(self):
         self.Socket.close()
         print(f"Ended connection with client({self.host})")
 
-
     def validateMessage(self):
         return True
 
-
     def reciveRequest(self) -> bytes:
         answer = self.Socket.recv(BUFFER_SIZE)
-        print(f"Got request from client")
+        print("Got request from client")
         return answer
-
 
     def sendResponse(self, msg: bytes) -> bool:
         if not self.validateMessage():
@@ -113,7 +103,7 @@ def getRequest(clientSocket: socket.socket) -> bytes:
 def handleClient(proxySocket: socket.socket, serverList: list[Server]):
     clientSocket, clientAddress = proxySocket.accept()
     newClient = Client(*clientAddress, clientSocket)
-    
+
     notFoundServer = True
     while notFoundServer:
         currentServer = chooseServer(serverList)
@@ -140,13 +130,14 @@ def initServers(communicationList: dict[Server:list[Client]] = {}) -> list[Serve
             communicationList[server] = []
         serverProps = input("Add more servers? (Y/N)")
         continueAsking = bool(re.search("[Y,y]", serverProps))
-    
+
     return communicationList
 
 
 def checkServerProps(serverProps: str) -> zip:
     serverProps = "^" + serverProps
-    hosts = re.findall("[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}", serverProps)
+    IPv4Format = "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
+    hosts = re.findall(IPv4Format, serverProps)
     for host in set(hosts):
         serverProps = serverProps.replace(host, ".")
     ports = re.findall("[^0-9][0-9]{1,5}", serverProps)
@@ -158,12 +149,14 @@ def lookForClients(communicationList: dict[Server:list[Client]], proxySocket: so
     communicationList = dict()
     while True:
         currentServer = chooseServer(communicationList.keys())
-        readList, _, _ = select.select([proxySocket] + communicationList.keys() + [clientList[0] for clientList in communicationList.values()] ,[], [])
+        sockList = communicationList.keys() + [clientList[0] for clientList in communicationList.values()]
+        sockList = [x.Socket for x in sockList]
+        readList, _, _ = select.select([proxySocket], [], [])
         for sock in readList:
             if sock is proxySocket:
                 getNewClient(communicationList, proxySocket, currentServer)
             elif sock in communicationList:
-                rsp = sock.handleRequest()s
+                rsp = sock.handleRequest()
 
 
 def interrupt():
@@ -185,7 +178,7 @@ def chooseServer(serverList: list[Server]) -> Server:
     return serverList[0]
 
 
-def getNewClient(communicationList: dict[Server:list[Client]], proxySocket:socket.socket , chosenServer:Server):
+def getNewClient(communicationList: dict[Server:list[Client]], proxySocket: socket.socket, chosenServer: Server):
     clientSocket, clientAddress = proxySocket.accept()
     newClient = Client(*clientAddress, clientSocket)
 
@@ -198,7 +191,7 @@ def runProxy():
         print("No servers were chosen, please try again")
         communicationList = initServers()
     proxySocket = initProxy()
-    
+
     proxySocket.listen(BACKLOG)
     print(f"Server listening on port {PORT}...")
 
@@ -207,10 +200,11 @@ def runProxy():
 
     lookForClientsThread.start()
     interruptThread.start()
-    
+
 
 def main():
     runProxy()
+
 
 if __name__ == "__main__":
     main()

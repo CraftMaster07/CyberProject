@@ -9,8 +9,6 @@ BUFFER_SIZE = 1024
 BACKLOG = 10
 
 
-
-
 def initServer():
     serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     serverSocket.bind((S_HOST, S_PORT))
@@ -19,28 +17,19 @@ def initServer():
     return serverSocket
 
 
-def findSourceRequested(requestHeader: str) -> str: 
+def findSourceRequested(requestHeader: str) -> str:
     RequestedFilePath = requestHeader.split(" ")[1]
     if RequestedFilePath == '/':
         return "/index.html"
     return RequestedFilePath
 
 
-def get_content_type_from_request(http_request):
-    # Split the HTTP request by lines
-    lines = http_request.split('\n')
-    
-    # Find the line containing 'Accept' header
-    accept_header = next((line for line in lines if line.startswith('Accept:')), None)
-    
-    if accept_header:
-        # Extract the requested content types
-        requested_content_types = accept_header.split(':')[1].strip().split(',')
-        
-        # Return the first requested content type
-        return requested_content_types[0].strip()
-        
-    # If no 'Accept' header found, default to plain text
+def getContentType(request):
+    request = request.split('\n')
+    header = next((line for line in request if line.startswith('Accept:')), None)
+    if header:
+        contentType = header.split(':')[1].strip().split(',')
+        return contentType[0].strip()
     return 'text/plain'
 
 
@@ -50,7 +39,6 @@ def handleRequest(clientSocket):
     except ConnectionResetError:
         clientSocket.close()
         return
-    
 
     print("Request:")
     print(request)
@@ -58,13 +46,13 @@ def handleRequest(clientSocket):
     reqFilePath = findSourceRequested(requestt[0])
 
     try:
-        with open(f"code/happybirthday{reqFilePath}",'r') as file:
+        with open(f"code/happybirthday{reqFilePath}", 'r') as file:
             response = file.read()
-    except:
-        with open(f"code/happybirthday{reqFilePath}",'rb') as file:
+    except UnicodeDecodeError:
+        with open(f"code/happybirthday{reqFilePath}", 'rb') as file:
             response = file.read()
 
-    contentType = get_content_type_from_request(request)
+    contentType = getContentType(request)
     if "image/avif" in contentType:
         contentType = contentType[:-4] + reqFilePath.split(".")[1]
         contentType += f"\r\nContent-Length: {len(response)}"
@@ -93,4 +81,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
