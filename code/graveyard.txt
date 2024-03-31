@@ -48,3 +48,21 @@ h1 {
 }
 """
 
+from proxyServer:
+"""
+
+def interrupt():
+    while True:
+        seconds = input()
+        if checkInterrupt:
+            seconds = seconds[1:]
+            print(f"Sleeping... {seconds}sec")
+            time.sleep(int(seconds))
+            print("finished")
+
+
+def checkInterrupt(inpt: str) -> bool:
+    checkForTime = re.match("^s\d+$", inpt)
+    return bool(checkForTime)
+"""
+
