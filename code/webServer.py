@@ -3,7 +3,7 @@ import psutil
 import os
 
 S_HOST = '127.0.0.1'
-S_PORT = 8080
+S_PORT = 12345
 BUFFER_SIZE = 1024
 BACKLOG = 10
 
