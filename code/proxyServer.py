@@ -14,7 +14,7 @@ class Server:
     def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
-        self.Socket:socket.socket = None
+        self.Socket:socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.clientList: list[Client] = []
         self.Thread: Thread = Thread(target=self.lookForClients)
 
@@ -38,14 +38,23 @@ class Server:
             self.Thread.start()
 
     def lookForClients(self):
+        emptySocket = socket.socket()
         while True:
             sockList = [client.Socket for client in self.clientList]
-            readList, _, _ = select.select([sockList], [], [])
+            print(f"socklist: {sockList}")
+            readList, _, _ = select.select([emptySocket] + sockList, [], [], 1)
+            if not readList:
+                continue
+
             for sock in readList:
-                if sock is proxySocket:
-                    getNewClient(communicationList, proxySocket, currentServer)
-                elif sock in communicationList:
-                    rsp = sock.handleRequest()
+                self.connectToServer()
+                client = next((client for client in self.clientList if client.Socket is sock), False)
+                if not client:
+                    continue
+                self.handleRequest(client)
+                client.closeConnection()
+                self.removeClient(client)
+                self.closeConnection()
 
     def validateMessage(self):
         return True
@@ -67,17 +76,19 @@ class Server:
         print("Got response from server")
         return answer
 
-    def handleRequest(self, request: bytes):
-        if not self.sendRequest(request):
-            return 'Error'
+    def handleRequest(self, client):
+        client: Client
+        req: bytes = client.reciveRequest()
+        if not self.sendRequest(req):
+            return
         rsp = self.reciveResponse()
-        return rsp
+        client.sendResponse(rsp)
     
     def insertClient(self, newClient):
-        self.clientList.insert(newClient)
+        self.clientList.append(newClient)
     
     def removeClient(self, newClient):
-        self.clientList.pop(newClient)
+        self.clientList.remove(newClient)
 
 
 class Client:
@@ -150,7 +161,7 @@ def handleClient(proxySocket: socket.socket, serverList: list[Server]):
     currentServer.closeConnection()
 
 
-def initServers(communicationList: list[Server] = {}) -> list[Server]:
+def initServers(communicationList: list[Server] = []) -> list[Server]:
     continueAsking = True
     while continueAsking:
         serverProps = input("Enter 1 or more servers' IPs and ports (i.e. 127.0.0.1, 12345): ")
@@ -161,6 +172,8 @@ def initServers(communicationList: list[Server] = {}) -> list[Server]:
         serverProps = input("Add more servers? (Y/N)")
         continueAsking = bool(re.search("[Y,y]", serverProps))
 
+    for server in communicationList:
+        server.startThread()
     return communicationList
 
 
@@ -177,15 +190,13 @@ def checkServerProps(serverProps: str) -> zip:
 
 def lookForClients(communicationList: list[Server], proxySocket: socket.socket):
     while True:
-        currentServer = chooseServer(communicationList.keys())
-        sockList = communicationList.keys() + [clientList[0] for clientList in communicationList.values()]
-        sockList = [x.Socket for x in sockList]
+        currentServer = chooseServer(communicationList)
         readList, _, _ = select.select([proxySocket], [], [])
         for sock in readList:
             if sock is proxySocket:
                 getNewClient(communicationList, proxySocket, currentServer)
             elif sock in communicationList:
-                rsp = sock.handleRequest()
+                pass
 
 
 def chooseServer(serverList: list[Server]) -> Server:
@@ -207,10 +218,7 @@ def runProxy():
 
     proxySocket.listen(BACKLOG)
     print(f"Server listening on port {PORT}...")
-
-    lookForClientsThread = Thread(target=lookForClients, args=(communicationList, proxySocket,))
-
-    lookForClientsThread.start()
+    lookForClients(communicationList, proxySocket,)
 
 
 def main():

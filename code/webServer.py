@@ -1,5 +1,4 @@
 import socket
-from threading import Thread
 import psutil
 import os
 
@@ -8,6 +7,22 @@ S_PORT = 8080
 BUFFER_SIZE = 1024
 BACKLOG = 10
 
+HTTP_RESPONSE = """\
+HTTP/1.1 200 OK
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>Page Title</title>
+</head>
+<body>
+
+<h1>My First Heading</h1>
+<p>My first paragraph.</p>
+
+</body>
+</html>
+"""
 
 def initServer():
     serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
