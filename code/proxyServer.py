@@ -2,7 +2,6 @@ import socket
 import select
 from threading import Thread
 import re
-import time
 import bleach
 
 HOST = '127.0.0.1'
@@ -15,8 +14,9 @@ class Server:
     def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
-        self.Socket = None
-        self.clientList = []
+        self.Socket:socket.socket = None
+        self.clientList: list[Client] = []
+        self.Thread: Thread = Thread(target=self.lookForClients)
 
     def connectToServer(self) -> bool:
         self.Socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -32,6 +32,20 @@ class Server:
     def closeConnection(self):
         self.Socket.close()
         print(f"Ended connection with server({self.host})")
+    
+    def startThread(self):
+        if not self.Thread.is_alive():
+            self.Thread.start()
+
+    def lookForClients(self):
+        while True:
+            sockList = [client.Socket for client in self.clientList]
+            readList, _, _ = select.select([sockList], [], [])
+            for sock in readList:
+                if sock is proxySocket:
+                    getNewClient(communicationList, proxySocket, currentServer)
+                elif sock in communicationList:
+                    rsp = sock.handleRequest()
 
     def validateMessage(self):
         return True
@@ -162,7 +176,6 @@ def checkServerProps(serverProps: str) -> zip:
 
 
 def lookForClients(communicationList: list[Server], proxySocket: socket.socket):
-    communicationList = dict()
     while True:
         currentServer = chooseServer(communicationList.keys())
         sockList = communicationList.keys() + [clientList[0] for clientList in communicationList.values()]
