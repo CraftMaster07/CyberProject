@@ -1,11 +1,13 @@
 import socket
 import psutil
 import os
+import re, bleach
 
 S_HOST = '127.0.0.1'
 S_PORT = 12345
 BUFFER_SIZE = 1024
 BACKLOG = 10
+DIRECTORY = "code/happybirthday"
 
 HTTP_RESPONSE = """\
 HTTP/1.1 200 OK
@@ -57,14 +59,28 @@ def handleRequest(clientSocket):
 
     print("Request:")
     print(request)
+    #response = directoryResponse(request)
+
+    with open("code\index.html", 'r') as file:
+        response = file.read()
+    response = (
+        "HTTP/1.1 200 OK\r\n\r\n"
+        f"{response}"
+    )
+
+    clientSocket.sendall(response.encode())
+    clientSocket.close()
+
+
+def directoryResponse(request: str) -> str:
     requestt = request.split("\r\n")
     reqFilePath = findSourceRequested(requestt[0])
 
     try:
-        with open(f"code/happybirthday{reqFilePath}", 'r') as file:
+        with open(f"{DIRECTORY}{reqFilePath}", 'r') as file:
             response = file.read()
     except UnicodeDecodeError:
-        with open(f"code/happybirthday{reqFilePath}", 'rb') as file:
+        with open(f"{DIRECTORY}{reqFilePath}", 'rb') as file:
             response = file.read()
 
     contentType = getContentType(request)
@@ -77,8 +93,7 @@ def handleRequest(clientSocket):
         f"Content-Type: {contentType}\r\n\r\n"
         f"{response}"
     )
-    clientSocket.sendall(response.encode())
-    clientSocket.close()
+    return response
 
 
 def runServer():

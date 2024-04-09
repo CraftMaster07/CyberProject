@@ -3,6 +3,7 @@ import select
 from threading import Thread
 import re
 import bleach
+import random
 
 HOST = '127.0.0.1'
 PORT = 8080
@@ -41,7 +42,7 @@ class Server:
         emptySocket = socket.socket()
         while True:
             sockList = [client.Socket for client in self.clientList]
-            print(f"socklist: {sockList}")
+            #print(f"socklist: {sockList}")
             readList, _, _ = select.select([emptySocket] + sockList, [], [], 1)
             if not readList:
                 continue
@@ -130,9 +131,22 @@ def sendMessage(dSock: socket.socket, request: bytes):
 
 def sanitizeMessage(msg: bytes) -> bytes:
     msg = msg.decode()
-    msg = bleach.clean(msg)
-    msg = msg.encode()
-    return msg
+
+    msgBody = re.search("\r\n\r\n", msg)
+    if msgBody:
+        bodyIndex = msgBody.span()[1]
+        msgHeaders = msg[:bodyIndex]
+        splitHeaders = msgHeaders.split('\r\n')
+
+        msgBody = msg[bodyIndex:]
+        msgBody = bleach.clean(msgBody)
+    
+    newMsg = msgHeaders + msgBody
+    newMsg = newMsg.encode()
+    return newMsg
+
+
+#def parseHTTPRequest():
 
 
 def getRequest(clientSocket: socket.socket) -> bytes:
@@ -200,7 +214,7 @@ def lookForClients(communicationList: list[Server], proxySocket: socket.socket):
 
 
 def chooseServer(serverList: list[Server]) -> Server:
-    return serverList[0]
+    return serverList[random.randint(0,1)]
 
 
 def getNewClient(communicationList: list[Server], proxySocket: socket.socket, chosenServer: Server):
