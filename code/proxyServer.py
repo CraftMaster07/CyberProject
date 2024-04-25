@@ -4,6 +4,20 @@ from threading import Thread
 import re
 import bleach
 import random
+import difflib
+
+def print_string_difference(str1, str2):
+    differ = difflib.Differ()
+    diff = list(differ.compare(str1.splitlines(), str2.splitlines()))
+    
+    differences = [line[2:] for line in diff if line.startswith('- ') or line.startswith('+ ')]
+    
+    if differences:
+        print("Differences found:")
+        for difference in differences:
+            print(difference)
+    else:
+        print("No differences found.")
 
 HOST = '127.0.0.1'
 PORT = 8080
@@ -66,7 +80,7 @@ class Server:
         try:
             msg = sanitizeMessage(msg)
             self.Socket.send(msg)
-        except ConnectionRefusedError:
+        except (ConnectionRefusedError, OSError) as e:
             self.closeConnection()
             print(f"** Server {self.host} crashed **")
             return False
@@ -142,6 +156,7 @@ def sanitizeMessage(msg: bytes) -> bytes:
         msgBody = bleach.clean(msgBody)
     
     newMsg = msgHeaders + msgBody
+    print(f"difference: {print_string_difference(msg, newMsg)}")
     newMsg = newMsg.encode()
     return newMsg
 
@@ -214,7 +229,7 @@ def lookForClients(communicationList: list[Server], proxySocket: socket.socket):
 
 
 def chooseServer(serverList: list[Server]) -> Server:
-    return serverList[random.randint(0,1)]
+    return serverList[random.randint(0,len(serverList)-1)]
 
 
 def getNewClient(communicationList: list[Server], proxySocket: socket.socket, chosenServer: Server):

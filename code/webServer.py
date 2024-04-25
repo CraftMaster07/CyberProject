@@ -1,7 +1,7 @@
 import socket
 import psutil
 import os
-import re, bleach
+
 
 S_HOST = '127.0.0.1'
 S_PORT = 12345
@@ -59,15 +59,15 @@ def handleRequest(clientSocket):
 
     print("Request:")
     print(request)
-    #response = directoryResponse(request)
-
+    response = directoryResponse(request)
+    '''
     with open("code\index.html", 'r') as file:
         response = file.read()
     response = (
         "HTTP/1.1 200 OK\r\n\r\n"
         f"{response}"
     )
-
+    '''
     clientSocket.sendall(response.encode())
     clientSocket.close()
 

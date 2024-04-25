@@ -1,5 +1,4 @@
 import socket
-from threading import Thread
 
 S_HOST = '127.0.0.1'
 S_PORT = 33333
