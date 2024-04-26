@@ -4,20 +4,7 @@ from threading import Thread
 import re
 import bleach
 import random
-import difflib
 
-def print_string_difference(str1, str2):
-    differ = difflib.Differ()
-    diff = list(differ.compare(str1.splitlines(), str2.splitlines()))
-    
-    differences = [line[2:] for line in diff if line.startswith('- ') or line.startswith('+ ')]
-    
-    if differences:
-        print("Differences found:")
-        for difference in differences:
-            print(difference)
-    else:
-        print("No differences found.")
 
 HOST = '127.0.0.1'
 PORT = 8080
@@ -159,7 +146,6 @@ def sanitizeMessage(msg: bytes) -> bytes:
     print(f"difference: {print_string_difference(msg, newMsg)}")
     newMsg = newMsg.encode()
     return newMsg
-
 
 #def parseHTTPRequest():
 
