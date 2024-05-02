@@ -4,6 +4,7 @@ from threading import Thread
 import re
 import bleach
 import random
+import time
 
 
 HOST = '127.0.0.1'
@@ -14,11 +15,12 @@ BACKLOG = 10
 
 class Server:
     def __init__(self, host: str, port: int):
-        self.host = host
-        self.port = port
+        self.host: str = host
+        self.port: int = port
         self.Socket:socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.clientList: list[Client] = []
         self.Thread: Thread = Thread(target=self.lookForClients)
+        self.stopThread: bool = False
 
     def connectToServer(self) -> bool:
         self.Socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -41,15 +43,16 @@ class Server:
 
     def lookForClients(self):
         emptySocket = socket.socket()
-        while True:
+        while not self.stopThread:
             sockList = [client.Socket for client in self.clientList]
-            #print(f"socklist: {sockList}")
             readList, _, _ = select.select([emptySocket] + sockList, [], [], 1)
             if not readList:
                 continue
 
             for sock in readList:
-                self.connectToServer()
+                if not self.connectToServer():
+                    self.stopThread = True
+                print(f"clientList: {self.clientList}")
                 client = next((client for client in self.clientList if client.Socket is sock), False)
                 if not client:
                     continue
@@ -143,7 +146,6 @@ def sanitizeMessage(msg: bytes) -> bytes:
         msgBody = bleach.clean(msgBody)
     
     newMsg = msgHeaders + msgBody
-    print(f"difference: {print_string_difference(msg, newMsg)}")
     newMsg = newMsg.encode()
     return newMsg
 
@@ -206,12 +208,11 @@ def checkServerProps(serverProps: str) -> zip:
 def lookForClients(communicationList: list[Server], proxySocket: socket.socket):
     while True:
         currentServer = chooseServer(communicationList)
-        readList, _, _ = select.select([proxySocket], [], [])
+        readList, _, _ = select.select([proxySocket], [], []) # get server status
         for sock in readList:
             if sock is proxySocket:
                 getNewClient(communicationList, proxySocket, currentServer)
-            elif sock in communicationList:
-                pass
+                    
 
 
 def chooseServer(serverList: list[Server]) -> Server:
