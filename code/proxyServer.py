@@ -52,7 +52,6 @@ class Server:
             for sock in readList:
                 if not self.connectToServer():
                     self.stopThread = True
-                print(f"clientList: {self.clientList}")
                 client = next((client for client in self.clientList if client.Socket is sock), False)
                 if not client:
                     continue
@@ -69,7 +68,7 @@ class Server:
             return False
         try:
             msg = sanitizeMessage(msg)
-            self.Socket.send(msg)
+            self.Socket.sendall(msg)
         except (ConnectionRefusedError, OSError) as e:
             self.closeConnection()
             print(f"** Server {self.host} crashed **")
@@ -77,7 +76,12 @@ class Server:
         return True
 
     def reciveResponse(self) -> bytes:
-        answer = self.Socket.recv(BUFFER_SIZE)
+        answer = b''
+        while True:
+            chunk = self.Socket.recv(BUFFER_SIZE)
+            if not chunk:
+                break
+            answer += chunk
         print("Got response from server")
         return answer
 
@@ -117,7 +121,7 @@ class Client:
     def sendResponse(self, msg: bytes) -> bool:
         if not self.validateMessage():
             return False
-        self.Socket.send(msg)
+        self.Socket.sendall(msg)
         return True
 
 
@@ -130,7 +134,7 @@ def initProxy():
 
 
 def sendMessage(dSock: socket.socket, request: bytes):
-    dSock.send(request)
+    dSock.sendall(request)
 
 
 def sanitizeMessage(msg: bytes) -> bytes:
@@ -208,10 +212,10 @@ def checkServerProps(serverProps: str) -> zip:
 def lookForClients(communicationList: list[Server], proxySocket: socket.socket):
     while True:
         currentServer = chooseServer(communicationList)
-        readList, _, _ = select.select([proxySocket], [], []) # get server status
+        readList, _, _ = select.select([proxySocket], [], []) # need to get server status
         for sock in readList:
             if sock is proxySocket:
-                getNewClient(communicationList, proxySocket, currentServer)
+                getNewClient(proxySocket, currentServer)
                     
 
 
@@ -219,7 +223,7 @@ def chooseServer(serverList: list[Server]) -> Server:
     return serverList[random.randint(0,len(serverList)-1)]
 
 
-def getNewClient(communicationList: list[Server], proxySocket: socket.socket, chosenServer: Server):
+def getNewClient(proxySocket: socket.socket, chosenServer: Server):
     clientSocket, clientAddress = proxySocket.accept()
     newClient = Client(*clientAddress, clientSocket)
     chosenServer.insertClient(newClient)
