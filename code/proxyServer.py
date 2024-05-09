@@ -28,14 +28,14 @@ class Server:
             self.Socket.connect((self.host, self.port))
             print(f"Connected to {self.host}")
             return True
-        except ConnectionRefusedError:
+        except (ConnectionRefusedError, TimeoutError) as e:
             self.closeConnection()
             print(f"** Server {self.host} crashed **")
             return False
 
     def closeConnection(self):
         self.Socket.close()
-        print(f"Ended connection with server({self.host})")
+        print(f"Ended connection with server({self.host}, {self.port})")
     
     def startThread(self):
         if not self.Thread.is_alive():
@@ -114,8 +114,15 @@ class Client:
         return True
 
     def reciveRequest(self) -> bytes:
+        '''answer = b''
+        while True:
+            chunk = self.Socket.recv(BUFFER_SIZE)
+            if not chunk:
+                break
+            answer += chunk
+            print("cycled")
+        print("Got request from client")'''
         answer = self.Socket.recv(BUFFER_SIZE)
-        print("Got request from client")
         return answer
 
     def sendResponse(self, msg: bytes) -> bool:
@@ -135,6 +142,16 @@ def initProxy():
 
 def sendMessage(dSock: socket.socket, request: bytes):
     dSock.sendall(request)
+
+
+def reciveData(sock: socket.socket) -> bytes:
+    answer = b''
+    while True:
+        chunk = sock.recv(BUFFER_SIZE)
+        if not chunk:
+            break
+        answer += chunk
+    return answer
 
 
 def sanitizeMessage(msg: bytes) -> bytes:
@@ -192,6 +209,7 @@ def initServers(communicationList: list[Server] = []) -> list[Server]:
             communicationList.append(server)
         serverProps = input("Add more servers? (Y/N)")
         continueAsking = bool(re.search("[Y,y]", serverProps))
+    print("Server(s): " + ", ".join([str(x.port) for x in communicationList]))
 
     for server in communicationList:
         server.startThread()
