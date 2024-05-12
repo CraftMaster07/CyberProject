@@ -8,7 +8,7 @@ BUFFER_SIZE = 1024
 BACKLOG = 10
 TINEOUT = 500
 DIRECTORY = "code/happybirthday"
-DIRECTORY = "newPage"
+DIRECTORY = "twoFiles"
 
 HTTP_RESPONSE = """\
 HTTP/1.1 200 OK
