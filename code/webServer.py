@@ -6,7 +6,6 @@ S_HOST = '127.0.0.1'
 S_PORT = 12345
 BUFFER_SIZE = 1024
 BACKLOG = 10
-TINEOUT = 500
 DIRECTORY = "code/happybirthday"
 DIRECTORY = "twoFiles"
 
@@ -29,7 +28,6 @@ HTTP/1.1 200 OK
 
 def initServer():
     serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    serverSocket.settimeout(TINEOUT)
     serverSocket.bind((S_HOST, S_PORT))
     print("Server is up and running!")
 

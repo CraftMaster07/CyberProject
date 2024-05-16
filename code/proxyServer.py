@@ -7,7 +7,7 @@ import random
 import time
 
 
-HOST = '127.0.0.1'
+HOST = '0.0.0.0'
 PORT = 8080
 BUFFER_SIZE = 1024
 BACKLOG = 10
@@ -17,6 +17,7 @@ class Server:
     def __init__(self, host: str, port: int):
         self.host: str = host
         self.port: int = port
+        self.name: list[str, int] = (self.host, self.port)
         self.Socket:socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.clientList: list[Client] = []
         self.Thread: Thread = Thread(target=self.lookForClients)
@@ -26,16 +27,16 @@ class Server:
         self.Socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             self.Socket.connect((self.host, self.port))
-            print(f"Connected to {self.host}")
+            print(f"Connected to Server {self.name}")
             return True
         except (ConnectionRefusedError, TimeoutError) as e:
             self.closeConnection()
-            print(f"** Server {self.host} crashed **")
+            print(f"** Server {self.name} crashed **")
             return False
 
     def closeConnection(self):
         self.Socket.close()
-        print(f"Ended connection with server({self.host}, {self.port})")
+        print(f"Ended connection with server({self.name})")
     
     def startThread(self):
         if not self.Thread.is_alive():
@@ -71,7 +72,7 @@ class Server:
             self.Socket.sendall(msg)
         except (ConnectionRefusedError, OSError) as e:
             self.closeConnection()
-            print(f"** Server {self.host} crashed **")
+            print(f"** Server {self.name} crashed on request attempt **")
             return False
         return True
 
@@ -102,13 +103,14 @@ class Server:
 
 class Client:
     def __init__(self, host: str, port: int, Socket: socket.socket):
-        self.host = host
-        self.port = port
-        self.Socket = Socket
+        self.host: str = host
+        self.port: int = port
+        self.name: list[str, int] = (self.host, self.port)
+        self.Socket: socket.socket = Socket
 
     def closeConnection(self):
         self.Socket.close()
-        print(f"Ended connection with client({self.host})")
+        print(f"Ended connection with client({self.name})")
 
     def validateMessage(self):
         return True
@@ -209,7 +211,7 @@ def initServers(communicationList: list[Server] = []) -> list[Server]:
             communicationList.append(server)
         serverProps = input("Add more servers? (Y/N)")
         continueAsking = bool(re.search("[Y,y]", serverProps))
-    print("Server(s): " + ", ".join([str(x.port) for x in communicationList]))
+    print("Server(s): " + ", ".join([str(x.name) for x in communicationList]))
 
     for server in communicationList:
         server.startThread()
