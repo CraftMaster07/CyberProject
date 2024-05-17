@@ -65,6 +65,26 @@ def checkInterrupt(inpt: str) -> bool:
     checkForTime = re.match("^s\d+$", inpt)
     return bool(checkForTime)
 """
+
+def handleClient(proxySocket: socket.socket, serverList: list[Server]):
+    clientSocket, clientAddress = proxySocket.accept()
+    newClient = Client(*clientAddress, clientSocket)
+
+    notFoundServer = True
+    while notFoundServer:
+        currentServer = chooseServer(serverList)
+        if currentServer.connectToServer():
+            notFoundServer = False
+        else:
+            serverList.remove(currentServer)
+
+    req = newClient.reciveRequest()
+    rsp = currentServer.handleRequest(req)
+    newClient.sendResponse(rsp)
+    newClient.closeConnection()
+
+    currentServer.closeConnection()
+
 newPage/index.html:
 
 <!DOCTYPE html>
