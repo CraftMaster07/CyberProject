@@ -1,12 +1,11 @@
 import socket
-import psutil
-import os
 
 S_HOST = '127.0.0.1'
 S_PORT = 12345
 BUFFER_SIZE = 1024
 BACKLOG = 10
 DIRECTORY = "code/happybirthday"
+DIRECTORY = "twoFiles"
 
 HTTP_RESPONSE = """\
 HTTP/1.1 200 OK
@@ -49,7 +48,7 @@ def getContentType(request):
     return 'text/plain'
 
 
-def handleRequest(clientSocket):
+def handleRequest(clientSocket: socket.socket):
     try:
         request = clientSocket.recv(BUFFER_SIZE).decode()
     except ConnectionResetError:

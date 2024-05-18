@@ -17,7 +17,6 @@ HTTP/1.1 200 OK
 
 <h1>My First Heading</h1>
 <p>My first paragraph.</p>
-
 </body>
 </html>
 """

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Greeting</title>
+    <style>
+        .hoverable {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Welcome!</h1>
+    <p id="greeting" class="hoverable">Hello, world!</p>
+    <button id="changeButton">Change Greeting</button>
+    <button id="redirectButton">Go to New Page</button>
+    <p id="currentTime">Current Time: <span></span></p>
+    <script src="script.js" defer></script>
+    <script>
+        // JavaScript code to handle the redirection
+        document.getElementById("redirectButton").addEventListener("click", function() {
+            window.location.href = "newPage.html";
+        });
+    </script>
+</body>
+</html>
