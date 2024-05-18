@@ -7,6 +7,10 @@ import logging
 import time
 from utils import checkServerProps
 from server import Server, Client
+import hashlib
+
+# user configuration
+useIPHashing = True
 
 
 HOST = '0.0.0.0'
@@ -51,6 +55,7 @@ class LoadBalancer:
         elif method == "random":
             server = self.random()
         else:
+            logger.error(f"Invalid method: {method}, defaulting to 'roundRobin'")
             server = self.roundRobin()
         
         if server.runThread:
@@ -63,6 +68,10 @@ class LoadBalancer:
         self.servers = serverList
         self.currentServerIndex = 0
     
+
+    def getServerForClient(self, client: Client) -> Server:
+        index = getServerIndex(client.host, len(self.servers))
+        return self.servers[index]
 
     def roundRobin(self) -> Server:
         server = self.servers[self.currentServerIndex]
@@ -111,22 +120,25 @@ def lookForClients(communicationList: list[Server], proxySocket: socket.socket):
     while True:
         if not communicationList:
             communicationList = initServers()
-        currentServer = proxyLoadBalancer.chooseServer("leastConnections")
-        if currentServer is None:
-            logger.error("No servers are available to handle client requests.")
-            time.sleep(5)  # Wait before retrying to avoid busy-waiting
-            continue
 
         readList, _, _ = select.select([proxySocket], [], []) # need to get server status
         for sock in readList:
             if sock is proxySocket:
-                getNewClient(proxySocket, currentServer)
+                getNewClient(proxySocket, proxyLoadBalancer)
 
 
-def getNewClient(proxySocket: socket.socket, chosenServer: Server):
+def getServerIndex(clientIP, serversLength):
+    hashValue = int(hashlib.md5(clientIP.encode()).hexdigest(), 16)
+    return hashValue % serversLength
+
+def getNewClient(proxySocket: socket.socket, proxyLoadBalancer: LoadBalancer):
     clientSocket, clientAddress = proxySocket.accept()
     newClient = Client(*clientAddress, clientSocket)
     logger.debug(f"New Client Joined: {newClient.name}")
+    if useIPHashing:
+        chosenServer = proxyLoadBalancer.getServerForClient(newClient)
+    else:
+        chosenServer = proxyLoadBalancer.chooseServer("leastConnections")
 
     if chosenServer is None:
         logger.error("No valid server available to handle the new client.")
