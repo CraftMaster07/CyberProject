@@ -2,7 +2,7 @@ import socket
 from threading import Thread
 
 HOST = '0.0.0.0'
-PORT = 8080
+PORT = 11111
 BUFFER_SIZE = 1024
 BACKLOG = 10
 

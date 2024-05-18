@@ -1,0 +1,103 @@
+from webServer:
+HTTP_RESPONSE = """\
+HTTP/1.1 200 OK
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>Page Title</title>
+</head>
+<body>
+
+<h1>My First Heading</h1>
+<p>My first paragraph.</p>
+
+</body>
+</html>
+"""
+
+HTTP_WITH_CSS_RESPONSE = """\
+HTTP/1.1 200 OK
+Content-Type: text/html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Example Page</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>Hello, world!</h1>
+    <p>This is an example webpage.</p>
+</body>
+</html>"""
+
+HTTP_WITH_CSS_RESPONSE2 = """\
+HTTP/1.1 200 OK
+Content-Type: text/css
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+}
+
+h1 {
+    color: green;
+}
+"""
+
+from proxyServer:
+"""
+
+def interrupt():
+    while True:
+        seconds = input()
+        if checkInterrupt:
+            seconds = seconds[1:]
+            print(f"Sleeping... {seconds}sec")
+            time.sleep(int(seconds))
+            print("finished")
+
+
+def checkInterrupt(inpt: str) -> bool:
+    checkForTime = re.match("^s\d+$", inpt)
+    return bool(checkForTime)
+"""
+
+def handleClient(proxySocket: socket.socket, serverList: list[Server]):
+    clientSocket, clientAddress = proxySocket.accept()
+    newClient = Client(*clientAddress, clientSocket)
+
+    notFoundServer = True
+    while notFoundServer:
+        currentServer = chooseServer(serverList)
+        if currentServer.connectToServer():
+            notFoundServer = False
+        else:
+            serverList.remove(currentServer)
+
+    req = newClient.reciveRequest()
+    rsp = currentServer.handleRequest(req)
+    newClient.sendResponse(rsp)
+    newClient.closeConnection()
+
+    currentServer.closeConnection()
+
+newPage/index.html:
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page 1</title>
+</head>
+<body>
+    <h1>This is Page 1</h1>
+    <p>Welcome to Page 1.</p>
+    <p><a href="page2.html">Go to Page 2</a></p>
+</body>
+</html>
+
