@@ -85,6 +85,32 @@ def handleClient(proxySocket: socket.socket, serverList: list[Server]):
 
     currentServer.closeConnection()
 
+
+def chooseServer(serverList: list[Server]) -> Server:
+    server:Server = serverList[random.randint(0,len(serverList)-1)]
+
+    if server.runThread:
+        return server
+    serverList.remove(server)
+    if not serverList:
+        logger.warning("*** ALL SERVERS ARE DOWN, PLEASE CHOOSE NEW SERVERS ***")
+        serverList.extend(initServers())
+    chooseServer(serverList)
+
+
+def sendMessage(dSock: socket.socket, request: bytes):
+    dSock.sendall(request)
+
+
+def reciveData(sock: socket.socket) -> bytes:
+    answer = b''
+    while True:
+        chunk = sock.recv(BUFFER_SIZE)
+        if not chunk:
+            break
+        answer += chunk
+    return answer
+
 newPage/index.html:
 
 <!DOCTYPE html>
