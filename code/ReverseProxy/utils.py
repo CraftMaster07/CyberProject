@@ -4,51 +4,20 @@ import re
 import bleach
 import html
 
-def sanitize_message(msg: bytes) -> bytes:
-    msg_str = msg.decode('utf-8', errors='ignore')
+def sanitizeMessage(msg: bytes) -> bytes:
+    msg = msg.decode('utf-8', errors='ignore')
 
-    header_end = msg_str.find("\r\n\r\n")
-    if header_end == -1:
+    headerEnd = msg.find("\r\n\r\n")
+    if headerEnd == -1:
         return msg
 
-    header = msg_str[:header_end]
-    body = msg_str[header_end + 4:]
+    header = msg[:headerEnd]
+    body = msg[headerEnd + 4:]
 
-    sanitized_body = bleach.clean(body)
+    sanitizedBody = bleach.clean(body, tags=bleach.sanitizer.ALLOWED_TAGS, attributes=bleach.sanitizer.ALLOWED_ATTRIBUTES)
 
-    sanitized_msg = header.encode('utf-8') + b"\r\n\r\n" + sanitized_body.encode('utf-8')
-    return sanitized_msg
-
-def sanitizeMessage(message: bytes) -> bytes:
-    """
-    Escapes HTML special characters in the input message to prevent XSS attacks.
-    
-    Args:
-        message (bytes): The input message to be sanitized.
-    
-    Returns:
-        bytes: The sanitized message.
-    """
-    # Dictionary of HTML escape characters in bytes
-    escape_chars = {
-        b'&': b'&amp;',
-        b'<': b'&lt;',
-        b'>': b'&gt;',
-        b'"': b'&quot;',
-        b"'": b'&#x27;',
-        b'/': b'&#x2F;',
-    }
-    
-    sanitized_message = bytearray()
-    
-    for byte in message:
-        sanitized_message += escape_chars.get(bytes([byte]), bytes([byte]))
-    
-    return bytes(sanitized_message)
-
-
-
-
+    sanitizedMsg = header.encode('utf-8') + b"\r\n\r\n" + sanitizedBody.encode('utf-8')
+    return sanitizedMsg
 
 
 def checkServerProps(serverProps: str) -> zip:
