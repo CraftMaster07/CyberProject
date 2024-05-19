@@ -1,3 +1,5 @@
+# proxyServer.py
+
 import socket
 import select
 from threading import Thread
@@ -70,8 +72,18 @@ class LoadBalancer:
     
 
     def getServerForClient(self, client: Client) -> Server:
+        if not self.servers:
+            logger.error("*** ALL SERVERS ARE DOWN, PLEASE CHOOSE NEW SERVERS ***")
+            self.updateServerList(initServers())
+
+        server: Server = None
         index = getServerIndex(client.host, len(self.servers))
-        return self.servers[index]
+        server = self.servers[index]
+        
+        if server.runThread:
+            return server
+        self.servers.remove(server)
+        self.getServerForClient(client)
 
     def roundRobin(self) -> Server:
         server = self.servers[self.currentServerIndex]

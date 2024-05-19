@@ -22,6 +22,36 @@ HTTP/1.1 200 OK
 """
 
 
+HTTP_RESPONSE = """\
+HTTP/1.1 200 OK
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>XSS Vulnerable Page</title>
+</head>
+<body>
+    <h1>Welcome to Our Website!</h1>
+    <p>Please enter your name:</p>
+    <form>
+        <input type="text" id="nameInput">
+        <button type="button" onclick="displayGreeting()">Submit</button>
+    </form>
+    <div id="greeting"></div>
+
+    <script>
+        function displayGreeting() {
+            var name = document.getElementById('nameInput').value;
+            var greeting = "Hello, " + name + "!";
+            document.getElementById('greeting').innerHTML = greeting;
+        }
+    </script>
+</body>
+</html>
+
+"""
+
+
 def initServer():
     serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     serverSocket.bind((S_HOST, S_PORT))

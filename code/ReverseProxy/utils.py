@@ -1,21 +1,54 @@
+# utils.py
+
 import re
 import bleach
+import html
 
-def sanitizeMessage(msg: bytes) -> bytes:
-    msg = msg.decode()
+def sanitize_message(msg: bytes) -> bytes:
+    msg_str = msg.decode('utf-8', errors='ignore')
 
-    msgBody = re.search("\r\n\r\n", msg)
-    if msgBody:
-        bodyIndex = msgBody.span()[1]
-        msgHeaders = msg[:bodyIndex]
-        splitHeaders = msgHeaders.split('\r\n')
+    header_end = msg_str.find("\r\n\r\n")
+    if header_end == -1:
+        return msg
 
-        msgBody = msg[bodyIndex:]
-        msgBody = bleach.clean(msgBody)
-        
-    newMsg = msgHeaders + msgBody
-    newMsg = newMsg.encode()
-    return newMsg
+    header = msg_str[:header_end]
+    body = msg_str[header_end + 4:]
+
+    sanitized_body = bleach.clean(body)
+
+    sanitized_msg = header.encode('utf-8') + b"\r\n\r\n" + sanitized_body.encode('utf-8')
+    return sanitized_msg
+
+def sanitizeMessage(message: bytes) -> bytes:
+    """
+    Escapes HTML special characters in the input message to prevent XSS attacks.
+    
+    Args:
+        message (bytes): The input message to be sanitized.
+    
+    Returns:
+        bytes: The sanitized message.
+    """
+    # Dictionary of HTML escape characters in bytes
+    escape_chars = {
+        b'&': b'&amp;',
+        b'<': b'&lt;',
+        b'>': b'&gt;',
+        b'"': b'&quot;',
+        b"'": b'&#x27;',
+        b'/': b'&#x2F;',
+    }
+    
+    sanitized_message = bytearray()
+    
+    for byte in message:
+        sanitized_message += escape_chars.get(bytes([byte]), bytes([byte]))
+    
+    return bytes(sanitized_message)
+
+
+
+
 
 
 def checkServerProps(serverProps: str) -> zip:
