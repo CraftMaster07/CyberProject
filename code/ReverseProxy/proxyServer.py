@@ -119,6 +119,8 @@ def initServers(communicationList: list[Server] = []) -> list[Server]:
         continueAsking = bool(re.search("[Y,y]", serverProps))
     if communicationList:
         logger.info("Server(s): " + ", ".join([str(x.name) for x in communicationList]))
+        with open('serverList.txt', 'w') as f:
+            f.write('\n'.join([str(x.name) for x in communicationList]))
         for server in communicationList:
             server.startThread()
     else:
@@ -150,7 +152,7 @@ def getNewClient(proxySocket: socket.socket, proxyLoadBalancer: LoadBalancer):
     if useIPHashing:
         chosenServer = proxyLoadBalancer.getServerForClient(newClient)
     else:
-        chosenServer = proxyLoadBalancer.chooseServer("leastConnections")
+        chosenServer = proxyLoadBalancer.chooseServer("roundRobin")
 
     if chosenServer is None:
         logger.error("No valid server available to handle the new client.")
@@ -160,8 +162,23 @@ def getNewClient(proxySocket: socket.socket, proxyLoadBalancer: LoadBalancer):
     chosenServer.insertClient(newClient)
 
 
+def getServersFromFile() -> list[Server]:
+    servers = []
+    with open('serverList.txt') as f:
+        serverProps = checkServerProps(f.read())
+        servers.extend(Server(host, int(port)) for host, port in serverProps)
+    return servers
+
+
+def addSavedServers():
+    logger.info("Add last saved servers? (Y/N)")
+    if re.search("[Y,y]", input()):
+        return getServersFromFile()
+    return []
+
+
 def runProxy():
-    communicationList = initServers()
+    communicationList = initServers(addSavedServers())
     proxySocket = initProxy()
 
     proxySocket.listen(BACKLOG)
