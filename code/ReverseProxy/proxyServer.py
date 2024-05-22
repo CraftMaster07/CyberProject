@@ -10,9 +10,11 @@ import time
 from utils import checkServerProps
 from server import Server, Client
 import hashlib
+import sqlite3
 
 # user configuration
 useIPHashing = True
+chooseServerByTime = True  # every set amount of time or choose server for each client
 
 
 HOST = '0.0.0.0'
@@ -20,20 +22,21 @@ PORT = 8080
 BUFFER_SIZE = 1024
 BACKLOG = 10
 ERROR = "error"
+TIME_INTERVAL = 1
+TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+con = sqlite3.connect("serverData.db")
+cur = con.cursor()
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
 formatter = logging.Formatter("[%(asctime)s]%(levelname)s: %(message)s",
-                              "%Y-%m-%d %H:%M:%S")
-
+                              TIME_FORMAT)
 fileHandler = logging.FileHandler('sample.log')
 fileHandler.setLevel(logging.CRITICAL)
 fileHandler.setFormatter(formatter)
-
 streamHandler = logging.StreamHandler()
 streamHandler.setFormatter(formatter)
-
 logger.addHandler(fileHandler)
 logger.addHandler(streamHandler)
 
@@ -83,6 +86,7 @@ class LoadBalancer:
         if server.runThread:
             return server
         self.servers.remove(server)
+        self.currentServerIndex = 0
         self.getServerForClient(client)
 
     def roundRobin(self) -> Server:
@@ -119,8 +123,14 @@ def initServers(communicationList: list[Server] = []) -> list[Server]:
         continueAsking = bool(re.search("[Y,y]", serverProps))
     if communicationList:
         logger.info("Server(s): " + ", ".join([str(x.name) for x in communicationList]))
-        with open('serverList.txt', 'w') as f:
-            f.write('\n'.join([str(x.name) for x in communicationList]))
+
+        data = [(x.host, x.port) for x in communicationList]
+        cur.executemany(
+            """
+            INSERT INTO serverData (host, port) VALUES (?, ?) ON CONFLICT DO NOTHING
+        """, data
+        )
+        con.commit()
         for server in communicationList:
             server.startThread()
     else:
@@ -131,6 +141,9 @@ def initServers(communicationList: list[Server] = []) -> list[Server]:
 
 def lookForClients(communicationList: list[Server], proxySocket: socket.socket):
     proxyLoadBalancer = LoadBalancer(communicationList)
+    timeLoopThread = Thread(target=chooseServerByTimeLoop, args=(proxyLoadBalancer,))
+    timeLoopThread.start()
+
     while True:
         if not communicationList:
             communicationList = initServers()
@@ -146,10 +159,14 @@ def getServerIndex(clientIP, serversLength):
     return hashValue % serversLength
 
 def getNewClient(proxySocket: socket.socket, proxyLoadBalancer: LoadBalancer):
+    global chosenServer
+
     clientSocket, clientAddress = proxySocket.accept()
     newClient = Client(*clientAddress, clientSocket)
     logger.debug(f"New Client Joined: {newClient.name}")
-    if useIPHashing:
+    if chooseServerByTime:
+        pass
+    elif useIPHashing:
         chosenServer = proxyLoadBalancer.getServerForClient(newClient)
     else:
         chosenServer = proxyLoadBalancer.chooseServer("roundRobin")
@@ -162,22 +179,47 @@ def getNewClient(proxySocket: socket.socket, proxyLoadBalancer: LoadBalancer):
     chosenServer.insertClient(newClient)
 
 
-def getServersFromFile() -> list[Server]:
-    servers = []
-    with open('serverList.txt') as f:
-        serverProps = checkServerProps(f.read())
-        servers.extend(Server(host, int(port)) for host, port in serverProps)
-    return servers
+def getServersFromDB() -> list[Server]:
+    try:
+        cur.execute("SELECT host, port FROM serverData")
+        return [Server(x[0], x[1]) for x in cur.fetchall()]
+    except sqlite3.OperationalError:
+        logger.info("No server data in DB")
+        return []
 
 
 def addSavedServers():
     logger.info("Add last saved servers? (Y/N)")
     if re.search("[Y,y]", input()):
-        return getServersFromFile()
+        return getServersFromDB()
     return []
 
 
+def chooseServerByTimeLoop(proxyLoadBalancer: LoadBalancer):
+    global chosenServer
+    
+    while chooseServerByTime:
+        chosenServer = proxyLoadBalancer.chooseServer()
+        time.sleep(TIME_INTERVAL)
+
+
+def initDB():
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS serverData (
+            host TEXT,
+            port INTEGER,
+            connectionsCount INTEGER,
+            airtime TEXT,
+            lastConnected TEXT,
+            lastCrashed TEXT
+        )
+        """
+    )
+    con.commit()
+
 def runProxy():
+    initDB()
     communicationList = initServers(addSavedServers())
     proxySocket = initProxy()
 

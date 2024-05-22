@@ -2,7 +2,6 @@
 
 import re
 import bleach
-import html
 
 def sanitizeMessage(msg: bytes) -> bytes:
     msg = msg.decode('utf-8', errors='ignore')

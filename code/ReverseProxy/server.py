@@ -4,10 +4,12 @@ import socket
 import select
 from threading import Thread
 import logging
-from utils import sanitizeMessage
+import time
+
 
 BUFFER_SIZE = 1024
 ERROR = "error"
+TIME_FORMAT = "%Y.%m.%d %H:%M:%S"
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +23,10 @@ class Server:
         self.clientList: list[Client] = []
         self.thread: Thread = Thread(target=self.lookForClients)
         self.runThread: bool = True  # stopping thread if set to false
+        self.clientCount: int = 0
+        self.initTime: int = 0
+        self.lastRequestTime: int = 0
+        self.lastCrashTime: int = 0
 
     def connectToServer(self) -> bool:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -31,6 +37,8 @@ class Server:
         except (ConnectionRefusedError, TimeoutError) as e:
             self.closeConnection()
             logger.error(f"** Server {self.name} Crashed **")
+            logger.debug(e)
+            self.lastCrashTime = self.getTime()
             return False
 
     def closeConnection(self):
@@ -63,11 +71,12 @@ class Server:
 
     def sendRequest(self, msg: bytes) -> bool:
         try:
-            msg = sanitizeMessage(msg)
             self.socket.sendall(msg)
         except (ConnectionError, OSError) as e:
             self.closeConnection()
             logger.error(f"** Server {self.name} Crashed on Request Attempt **")
+            logger.debug(e)
+            self.lastCrashTime = self.getTime()
             return False
         return True
 
@@ -87,6 +96,7 @@ class Server:
     def handleRequest(self, client):
         client: Client
         req: bytes = client.reciveRequest()
+        self.lastRequestTime = self.getTime()
         if req == ERROR:
             return
         if not self.sendRequest(req):
@@ -104,6 +114,9 @@ class Server:
             self.clientList.remove(newClient)
         except ValueError:
             pass
+    
+    def getTime() -> str:
+        return time.strftime(TIME_FORMAT, time.localtime())
 
 
 
