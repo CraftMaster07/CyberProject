@@ -13,26 +13,54 @@ TIME_FORMAT = "%Y.%m.%d %H:%M:%S"
 
 logger = logging.getLogger(__name__)
 
-
-class Server:
-    def __init__(self, host: str, port: int):
+class BaseConnection:
+    def __init__(self, host: str, port: int, type: str = "Abstract"):
         self.host: str = host
         self.port: int = port
         self.name: tuple[str, int] = (self.host, self.port)
         self.socket: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.initTime: int = int(time.time())
+        self.type: str = type
+
+    def connectToServer(self):
+        self.socket.connect((self.host, self.port))
+        logger.debug(f"Connected to {self.type} {self.name}")
+
+    def closeConnection(self):
+        self.socket.close()
+        logger.debug(f"Ended Connection with {self.type} {self.name}")
+
+    def sendData(self, data: bytes):
+        try:
+            self.socket.sendall(data)
+        except ConnectionError:
+            return ERROR
+
+    def reciveData(self) -> bytes:
+        try:
+            answer = self.socket.recv(BUFFER_SIZE)
+        except ConnectionError:
+            return ERROR
+        return answer
+
+    def getTime(self) -> int:
+        return time.strftime(TIME_FORMAT, time.localtime())
+
+
+class Server(BaseConnection):
+    def __init__(self, host: str, port: int):
+        super().__init__(host, port, "Server")
         self.clientList: list[Client] = []
         self.thread: Thread = Thread(target=self.lookForClients)
         self.runThread: bool = True  # stopping thread if set to false
         self.clientCount: int = 0
-        self.initTime: int = 0
         self.lastRequestTime: int = 0
         self.lastCrashTime: int = 0
 
     def connectToServer(self) -> bool:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            self.socket.connect((self.host, self.port))
-            logger.debug(f"Connected to Server {self.name}")
+            super().connectToServer()
             return True
         except (ConnectionRefusedError, TimeoutError) as e:
             self.closeConnection()
@@ -40,10 +68,6 @@ class Server:
             logger.debug(e)
             self.lastCrashTime = self.getTime()
             return False
-
-    def closeConnection(self):
-        self.socket.close()
-        logger.debug(f"Ended Connection with Server {self.name}")
     
     def startThread(self):
         if not self.thread.is_alive():
@@ -71,7 +95,7 @@ class Server:
 
     def sendRequest(self, msg: bytes) -> bool:
         try:
-            self.socket.sendall(msg)
+            super().sendData(msg)
         except (ConnectionError, OSError) as e:
             self.closeConnection()
             logger.error(f"** Server {self.name} Crashed on Request Attempt **")
@@ -84,10 +108,10 @@ class Server:
         answer = b''
         while True:
             try:
-                chunk = self.socket.recv(BUFFER_SIZE)
+                chunk = super().reciveData()
             except ConnectionError:
                 return ERROR
-            if not chunk:
+            if not chunk or chunk == ERROR:
                 break
             answer += chunk
         logger.debug(f"Got Response from Server {self.name}")
@@ -95,7 +119,7 @@ class Server:
 
     def handleRequest(self, client):
         client: Client
-        req: bytes = client.reciveRequest()
+        req: bytes = client.reciveData()
         self.lastRequestTime = self.getTime()
         if req == ERROR:
             return
@@ -104,7 +128,7 @@ class Server:
         rsp = self.reciveResponse()
         if rsp == ERROR:
             return
-        client.sendResponse(rsp)
+        client.sendData(rsp)
     
     def insertClient(self, newClient):
         self.clientList.append(newClient)
@@ -114,30 +138,10 @@ class Server:
             self.clientList.remove(newClient)
         except ValueError:
             pass
-    
-    def getTime() -> str:
-        return time.strftime(TIME_FORMAT, time.localtime())
 
 
 
-class Client:
+class Client(BaseConnection):
     def __init__(self, host: str, port: int, Socket: socket.socket):
-        self.host: str = host
-        self.port: int = port
-        self.name: tuple[str, int] = (self.host, self.port)
-        self.socket: socket.socket = Socket
-
-    def closeConnection(self):
-        self.socket.close()
-        logger.debug(f"Ended connection with client {self.name}")
-
-    def reciveRequest(self) -> bytes:
-        try:
-            answer = self.socket.recv(BUFFER_SIZE)
-        except ConnectionError:
-            return ERROR
-        return answer
-
-    def sendResponse(self, msg: bytes) -> bool:
-        self.socket.sendall(msg)
-        return True
+        super().__init__(host, port, "Client")
+        self.socket = Socket

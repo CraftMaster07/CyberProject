@@ -90,7 +90,11 @@ class LoadBalancer:
         self.getServerForClient(client)
 
     def roundRobin(self) -> Server:
-        server = self.servers[self.currentServerIndex]
+        try:
+            server = self.servers[self.currentServerIndex]
+        except IndexError:
+            self.currentServerIndex = 0
+            server = self.servers[self.currentServerIndex]
         self.currentServerIndex = (self.currentServerIndex + 1) % len(self.servers)
         return server
 
