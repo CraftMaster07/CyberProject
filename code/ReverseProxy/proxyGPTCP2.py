@@ -11,6 +11,8 @@ servers = [
     {"ip": "192.168.1.6", "port": 8085, "status": "up", "connections": 8, "airtime": "12h", "lastConnected": "2024-05-23 08:45:00", "lastCrashed": "2024-05-19 09:50:00"}
 ]
 
+configs = ['host', 'port', 'buffer size', 'backlog', 'time format']
+
 # Color palette
 color_text = "#DFF5FF"
 color_new = "#5356FF"
@@ -81,12 +83,14 @@ def main(page: Page):
                     server_list(),
                     # Add more server management elements here...
                 ]
-            )
+            ),
+                
         )
 
     # Configuration Section
     lb_method = Dropdown(
         label="Load Balancing Method",
+        width=230,
         options=[
             ft.dropdown.Option(key="roundRobin", text="Round Robin"),
             ft.dropdown.Option(key="leastConnections", text="Least Connections"),
@@ -95,20 +99,27 @@ def main(page: Page):
         ],
         border_color=color_tertiary
     )
-    retry_limit = TextField(label="Retry Limit", border_color=color_tertiary)
-    use_ip_hashing = Switch(label="Use IP Hashing")
+    retry_limit = TextField(label="Retry Limit", border_color=color_tertiary, width=230)
+    
     
     choose_by_group = RadioGroup(content=Column([
         Radio(value="time", label="By Time"),
         Radio(value="user", label="By User")
     ]))
 
+    time_interval = TextField(label="Time Interval (in seconds)", border_color=color_tertiary, value=1, width=230)
+
+    load_servers = RadioGroup(content=Column([
+        Radio(value="a", label="From Last Saved Servers"),
+        Radio(value="b", label="From Default Servers")
+    ]))
+
+
     def save_configuration(e):
         method = lb_method.value
         retries = int(retry_limit.value)
-        ip_hashing = use_ip_hashing.value
         chosen_by = choose_by_group.value
-        print(f"Configuration saved: Method={method}, Retries={retries}, IP Hashing={ip_hashing}, Choose Server By={chosen_by}")
+        print(f"Configuration saved: Method={method}, Retries={retries}, Choose Server By={chosen_by}")
         # Here you can add logic to actually save the configuration
         page.snack_bar(ft.SnackBar(Text(f"Configuration saved!", color=color_text), open=True, bgcolor=color_tertiary))
 
@@ -120,14 +131,46 @@ def main(page: Page):
                 expand=True,
                 controls=[
                     Text("Configuration", style="headlineMedium", color=color_text),
+                    Text(height=1),
+                    ElevatedButton(text="Save Configuration", on_click=save_configuration, color=color_text, bgcolor=color_tertiary),
+                    Text(size=4),
                     lb_method,
                     retry_limit,
-                    use_ip_hashing,
                     Text("Choose Server By:", color=color_text),
                     choose_by_group,
+                    time_interval,
+                    Text("Load Servers From:", color=color_text),
+                    load_servers,
+                    Row(
+                        controls=[
+                            Text('Host: ', color=color_text, size=20),
+                            TextField(value="0.0.0.0", border_color=color_tertiary, width=230)
+                        ]
+                    ),
+                    Row(
+                        controls=[
+                            Text('Port: ', color=color_text, size=20),
+                            TextField(value="8080", border_color=color_tertiary, width=230)
+                        ]
+                    ),
+                    Row(
+                        controls=[
+                            Text('Buffer size: ', color=color_text, size=20),
+                            TextField(value="1024", border_color=color_tertiary, width=230)
+                        ]
+                    ),
+                    Row(
+                        controls=[
+                            Text('Backlog: ', color=color_text, size=20),
+                            TextField(value="5", border_color=color_tertiary, width=230)
+                        ]
+                    ),
+                    Text(),
                     ElevatedButton(text="Save Configuration", on_click=save_configuration, color=color_text, bgcolor=color_tertiary),
+                    Text(),
                     # Add more configuration elements here...
-                ]
+                ],
+                scroll="auto"
             )
         )
 
