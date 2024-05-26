@@ -8,7 +8,7 @@ import random
 import logging
 import time
 from utils import checkServerProps
-from server import Server, Client
+from connectionObjects import Server, Client
 import hashlib
 import sqlite3
 
