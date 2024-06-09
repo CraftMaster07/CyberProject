@@ -48,14 +48,14 @@ class BaseConnection:
 
 
 class Server(BaseConnection):
-    def __init__(self, host: str, port: int):
+    def __init__(self, host: str, port: int, clientCount: int = 0, lastRequestTime: int = 0, lastCrashTime: int = 0):
         super().__init__(host, port, "Server")
         self.clientList: list[Client] = []
         self.thread: Thread = Thread(target=self.lookForClients)
         self.runThread: bool = True  # stopping thread if set to false
-        self.clientCount: int = 0
-        self.lastRequestTime: int = 0
-        self.lastCrashTime: int = 0
+        self.clientCount: int = clientCount
+        self.lastRequestTime: int = lastRequestTime
+        self.lastCrashTime: int = lastCrashTime
 
     def connectToServer(self) -> bool:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -96,6 +96,8 @@ class Server(BaseConnection):
     def sendRequest(self, msg: bytes) -> bool:
         try:
             super().sendData(msg)
+            self.clientCount += 1
+            self.lastRequestTime = self.getTime()
         except (ConnectionError, OSError) as e:
             self.closeConnection()
             logger.error(f"** Server {self.name} Crashed on Request Attempt **")

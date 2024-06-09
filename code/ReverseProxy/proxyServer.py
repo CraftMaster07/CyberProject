@@ -121,7 +121,8 @@ def initServers(communicationList: list[Server] = []) -> list[Server]:
         logger.info("Enter 1 or more servers' IPs and ports (i.e. 127.0.0.1, 12345): ")
         serverProps = input()
         serverProps = checkServerProps(serverProps)
-        communicationList.extend(Server(host, int(port)) for host, port in serverProps)
+        newServers = set(serverProps) - set(communicationList)
+        communicationList.extend(Server(host, int(port)) for host, port in newServers)
         logger.info("Add more servers? (Y/N)")
         serverProps = input()
         continueAsking = bool(re.search("[Y,y]", serverProps))
@@ -197,6 +198,26 @@ def addSavedServers():
     if re.search("[Y,y]", input()):
         return getServersFromDB()
     return []
+
+
+def updateDB(servers: list[Server]):
+    cur.executemany(
+        """
+        SELECT airtime FROM serverData
+        WHERE host = ? AND port = ?
+        """,
+        [(server.host, server.port) for server in servers]
+    )
+
+    airTimeList = iter(cur.fetchall())
+    cur.executemany(
+        """
+        UPDATE serverData
+        SET connectionsCount = ?, airtime = ?, lastConnected = ?, lastCrashed = ?
+        WHERE host = ? AND port = ?
+        """,
+        [(server.clientCount, next(airTimeList) + (time.time() - server.initTime), server.lastRequestTime, server.lastCrashTime, server.host, server.port) for server in servers]
+    )
 
 
 def chooseServerByTimeLoop(proxyLoadBalancer: LoadBalancer):
