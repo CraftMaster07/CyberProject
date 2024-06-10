@@ -63,6 +63,7 @@ class LoadBalancer:
             logger.error(f"Invalid method: {method}, defaulting to 'roundRobin'")
             server = self.roundRobin()
         
+        updateDB(self.servers)
         if server.runThread:
             return server
         self.servers.remove(server)
@@ -132,7 +133,7 @@ def initServers(communicationList: list[Server] = []) -> list[Server]:
         data = [(x.host, x.port) for x in communicationList]
         cur.executemany(
             """
-            INSERT INTO serverData (host, port) VALUES (?, ?) ON CONFLICT DO NOTHING
+            INSERT OR IGNORE INTO serverData (host, port) VALUES (?, ?)
         """, data
         )
         con.commit()
@@ -147,7 +148,7 @@ def initServers(communicationList: list[Server] = []) -> list[Server]:
 def lookForClients(communicationList: list[Server], proxySocket: socket.socket):
     proxyLoadBalancer = LoadBalancer(communicationList)
     timeLoopThread = Thread(target=chooseServerByTimeLoop, args=(proxyLoadBalancer,))
-    timeLoopThread.start()
+    timeLoopThread.start() build here
 
     while True:
         if not communicationList:
@@ -201,16 +202,30 @@ def addSavedServers():
 
 
 def updateDB(servers: list[Server]):
-    cur.executemany(
-        """
-        SELECT airtime FROM serverData
-        WHERE host = ? AND port = ?
-        """,
-        [(server.host, server.port) for server in servers]
-    )
+    curs = cur
+    try:
+        cur.execute("")
+    except sqlite3.ProgrammingError:
+        con = sqlite3.connect("serverData.db")
+        curs = con.cursor()
 
-    airTimeList = iter(cur.fetchall())
-    cur.executemany(
+    airTimeList = []
+    for host, port in [(server.host, server.port) for server in servers]:
+        curs.execute(
+            """
+            SELECT airtime FROM serverData
+            WHERE host = ? AND port = ?
+            """,
+            (host, port) 
+        )
+        airTime = curs.fetchone()[0]
+        if not airTime:
+            airTimeList.append(0)
+            continue
+        airTimeList.append(int(airTime))
+
+    airTimeList = iter(airTimeList)
+    curs.executemany(
         """
         UPDATE serverData
         SET connectionsCount = ?, airtime = ?, lastConnected = ?, lastCrashed = ?
@@ -237,7 +252,8 @@ def initDB():
             connectionsCount INTEGER,
             airtime TEXT,
             lastConnected TEXT,
-            lastCrashed TEXT
+            lastCrashed TEXT,
+            UNIQUE(host, port)
         )
         """
     )
