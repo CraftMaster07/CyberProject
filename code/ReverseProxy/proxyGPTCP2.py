@@ -133,7 +133,7 @@ def main(page: Page):
                     Text("Configuration", style="headlineMedium", color=color_text),
                     Text(height=1),
                     ElevatedButton(text="Save Configuration", on_click=save_configuration, color=color_text, bgcolor=color_tertiary),
-                    Text(size=4),
+                    Text(height=0.2),
                     lb_method,
                     retry_limit,
                     Text("Choose Server By:", color=color_text),

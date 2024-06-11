@@ -44,7 +44,7 @@ class BaseConnection:
         return answer
 
     def getTime(self) -> int:
-        return time.strftime(TIME_FORMAT, time.localtime())
+        return time.strftime(TIME_FORMAT, time.localtime() - self.initTime)
 
 
 class Server(BaseConnection):
@@ -56,6 +56,7 @@ class Server(BaseConnection):
         self.clientCount: int = clientCount
         self.lastRequestTime: int = lastRequestTime
         self.lastCrashTime: int = lastCrashTime
+        self.lastCheckedTime: int = int(time.time())
 
     def connectToServer(self) -> bool:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

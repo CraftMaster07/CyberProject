@@ -200,11 +200,16 @@ def getServersFromDB() -> list[Server]:
         return []
 
 
-def addSavedServers():
+def addSavedServersInput():
     logger.info("Add last saved servers? (Y/N)")
     if re.search("[Y,y]", input()):
         return getServersFromDB()
     return []
+
+
+def addSavedServers(flag: bool = True):
+    if flag:
+        return getServersFromDB()
 
 
 def updateDB(servers: list[Server]):
@@ -230,9 +235,11 @@ def updateDB(servers: list[Server]):
         SET connectionsCount = ?, airtime = ?, lastConnected = ?, lastCrashed = ?
         WHERE host = ? AND port = ?
         """,
-        [(server.clientCount, next(airTimeList) + int(time.time() - server.initTime), server.lastRequestTime, server.lastCrashTime, server.host, server.port) for server in servers]
+        [(server.clientCount, next(airTimeList) + int(time.time() - server.lastCheckedTime), server.lastRequestTime, server.lastCrashTime, server.host, server.port) for server in servers]
     )
     con.commit()
+    for server in servers:
+        server.lastCheckedTime = int(time.time())
 
 
 def chooseServerByTimeLoop(proxyLoadBalancer: LoadBalancer):
