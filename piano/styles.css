@@ -1,0 +1,33 @@
+/* styles.css */
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    background-color: #f0f0f0;
+}
+
+#piano {
+    display: flex;
+}
+
+.key {
+    width: 60px;
+    height: 200px;
+    margin: 1px;
+    border: 1px solid #000;
+    border-radius: 5px;
+    text-align: center;
+    line-height: 200px;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.white {
+    background-color: white;
+}
+
+.white:active {
+    background-color: #ddd;
+}

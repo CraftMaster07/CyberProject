@@ -118,21 +118,29 @@ def initProxy() -> socket.socket:
 
 def initServersInput(communicationList: list[Server] = []) -> list[Server]:
     continueAsking = True
+    serverProps = ""
     while continueAsking:
         logger.info("Enter 1 or more servers' IPs and ports (i.e. 127.0.0.1, 12345): ")
-        serverProps = input()
-        serverProps = checkServerProps(serverProps)
-        communicationList.extend(Server(host, int(port)) for host, port in serverProps)
-        seen = set()
-        communicationList = [x for x in communicationList if not (x.host, x.port) in seen and not seen.add((x.host, x.port))]
+        serverProps += input()
         logger.info("Add more servers? (Y/N)")
-        serverProps = input()
-        continueAsking = bool(re.search("[Y,y]", serverProps))
-    if communicationList:
-        return initServers(communicationList)
-    else:
+        continueAsking = bool(re.search("[Y,y]", input()))
+    communicationList = addServers(serverProps, communicationList)
+    if not communicationList:
         logger.info("No Servers were Chosen")
         initServersInput(communicationList)
+    return communicationList
+
+        
+
+
+def addServers(serverProps: str, communicationList: list[Server] = []) -> list[Server]:
+    updateDB(communicationList)
+    serverProps = checkServerProps(serverProps)
+    communicationList.extend(Server(host, int(port)) for host, port in serverProps)
+    seen = set()
+    communicationList = [x for x in communicationList if not (x.host, x.port) in seen and not seen.add((x.host, x.port))]
+    updateDataFromDB(communicationList)
+    return initServers(communicationList)
 
 
 def initServers(communicationList: list[Server] = []) -> list[Server]:
@@ -193,8 +201,8 @@ def getNewClient(proxySocket: socket.socket, proxyLoadBalancer: LoadBalancer):
 
 def getServersFromDB() -> list[Server]:
     try:
-        cur.execute("SELECT host, port FROM serverData")
-        return [Server(x[0], x[1]) for x in cur.fetchall()]
+        cur.execute("SELECT host, port FROM serverData ORDER BY host, port")
+        return addServers(str(cur.fetchall()))
     except sqlite3.OperationalError:
         logger.info("No server data in DB")
         return []
@@ -213,6 +221,8 @@ def addSavedServers(flag: bool = True):
 
 
 def updateDB(servers: list[Server]):
+    if not servers:
+        return
     airTimeList = []
     for host, port in [(server.host, server.port) for server in servers]:
         cur.execute(
@@ -242,6 +252,23 @@ def updateDB(servers: list[Server]):
         server.lastCheckedTime = int(time.time())
 
 
+def updateDataFromDB(servers: list[Server]):
+    if not servers:
+        return
+    for server in servers:
+        cur.execute(
+            """
+            SELECT connectionsCount, lastConnected, lastCrashed FROM serverData
+            WHERE host = ? AND port = ?
+            """,
+            (server.host, server.port)
+        )
+        serverProps = cur.fetchone()
+        if serverProps:
+            server.clientCount, server.lastRequestTime, server.lastCrashTime = serverProps
+
+
+
 def chooseServerByTimeLoop(proxyLoadBalancer: LoadBalancer):
     global chosenServer
     
@@ -268,7 +295,7 @@ def initDB():
 
 def runProxy():
     initDB()
-    communicationList = initServersInput(addSavedServers())
+    communicationList = initServersInput(addSavedServersInput())
     proxySocket = initProxy()
 
     proxySocket.listen(BACKLOG)

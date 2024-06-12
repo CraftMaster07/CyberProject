@@ -3,7 +3,7 @@ from flet import Page, Text, Row, Column, Container, ElevatedButton, TextField, 
 
 # Mock data for servers
 servers = [
-    {"ip": "192.168.1.1", "port": 8080, "status": "up", "connections": 5, "airtime": "10h", "lastConnected": "2024-05-20 10:00:00", "lastCrashed": "2024-05-18 08:00:00"},
+    {"ip": "192.168.1.1", "port": 8080, "status": "up", "connections": 5, "airtime": "10h 24m", "lastConnected": "2024-05-20 10:00:00", "lastCrashed": "2024-05-18 08:00:00"},
     {"ip": "192.168.1.2", "port": 8081, "status": "down", "connections": 0, "airtime": "5h", "lastConnected": "2024-05-19 14:00:00", "lastCrashed": "2024-05-21 12:00:00"},
     {"ip": "192.168.1.3", "port": 8082, "status": "up", "connections": 10, "airtime": "15h", "lastConnected": "2024-05-22 09:30:00", "lastCrashed": "2024-05-17 07:45:00"},
     {"ip": "192.168.1.4", "port": 8083, "status": "up", "connections": 3, "airtime": "8h", "lastConnected": "2024-05-21 11:00:00", "lastCrashed": "2024-05-20 06:30:00"},
@@ -20,6 +20,8 @@ color_secondary = "#378CE7"
 color_tertiary = "#67C6E3"
 color_background = "#494CEF"#"#4346F8"
 
+SUBTITLE_TEXT_STYLE = ft.TextStyle(size=20, color=color_text)
+
 def main(page: Page):
     page.title = "ReverseProxy Control Panel"
     page.window_width = 950
@@ -32,7 +34,7 @@ def main(page: Page):
             [
                 ft.ListTile(
                     leading=ft.Icon(ft.icons.STORAGE, color=color_text),
-                    subtitle=ft.Text(f"IP: {server['ip']}, Port: {server['port']}, Status: {server['status']}", size=20, color=color_text),
+                    subtitle=ft.Text(f"IP: {server['ip']}, Port: {server['port']}, Status: {server['status']}", style=SUBTITLE_TEXT_STYLE),
                     data=server  # Store server data in the ListTile
                 )
                 for server in servers
@@ -117,9 +119,8 @@ def main(page: Page):
 
     def save_configuration(e):
         method = lb_method.value
-        retries = int(retry_limit.value)
         chosen_by = choose_by_group.value
-        print(f"Configuration saved: Method={method}, Retries={retries}, Choose Server By={chosen_by}")
+        print(f"Configuration saved: Method={method}, Choose Server By={chosen_by}")
         # Here you can add logic to actually save the configuration
         page.snack_bar(ft.SnackBar(Text(f"Configuration saved!", color=color_text), open=True, bgcolor=color_tertiary))
 

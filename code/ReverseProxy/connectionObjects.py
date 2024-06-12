@@ -44,7 +44,7 @@ class BaseConnection:
         return answer
 
     def getTime(self) -> int:
-        return time.strftime(TIME_FORMAT, time.localtime() - self.initTime)
+        return time.strftime(TIME_FORMAT, time.localtime())
 
 
 class Server(BaseConnection):
