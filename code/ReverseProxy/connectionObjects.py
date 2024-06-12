@@ -72,7 +72,10 @@ class Server(BaseConnection):
     
     def startThread(self):
         if not self.thread.is_alive():
-            self.thread.start()
+            try:
+                self.thread.start()
+            except RuntimeError as e:
+                pass
 
     def lookForClients(self):
         emptySocket = socket.socket()

@@ -18,12 +18,15 @@ chooseServerByTime = True  # every set amount of time or choose server for each 
 
 
 HOST = '0.0.0.0'
+MAX_HOST_LENGTH = 15
 PORT = 8080
+MAX_PORT_LENGTH = 5
 BUFFER_SIZE = 1024
 BACKLOG = 10
 ERROR = "error"
 TIME_INTERVAL = 1
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+
 
 con = sqlite3.connect("serverData.db", check_same_thread=False)
 cur = con.cursor()
@@ -42,14 +45,17 @@ logger.addHandler(streamHandler)
 
 
 class LoadBalancer:
-    def __init__(self, servers: list[Server]):
+    def __init__(self, servers: list[Server], allowInput: bool = False):
         self.servers: list[Server] = servers
         self.currentServerIndex: int = 0
+        self.allowInput: bool = allowInput
 
 
     def chooseServer(self, method="roundRobin") -> Server:
         if not self.servers:
             logger.error("*** ALL SERVERS ARE DOWN, PLEASE CHOOSE NEW SERVERS ***")
+            if not self.allowInput:
+                return None
             self.updateServerList(initServersInput())
         server: Server = None
 
@@ -159,14 +165,18 @@ def initServers(communicationList: list[Server] = []) -> list[Server]:
     return communicationList
 
 
-def lookForClients(communicationList: list[Server], proxySocket: socket.socket):
-    proxyLoadBalancer = LoadBalancer(communicationList)
+def lookForClients(communicationList: list[Server], proxySocket: socket.socket, allowInput: bool = False):
+    proxyLoadBalancer = LoadBalancer(communicationList, allowInput)
     timeLoopThread = Thread(target=chooseServerByTimeLoop, args=(proxyLoadBalancer,))
     timeLoopThread.start()
 
     while True:
         if not communicationList:
-            communicationList = initServersInput()
+            logger.error("*** ALL SERVERS ARE DOWN, PLEASE CHOOSE NEW SERVERS ***")
+            if allowInput:
+                communicationList = initServersInput(communicationList)
+            else:
+                time.sleep(3)
 
         readList, _, _ = select.select([proxySocket], [], []) # need to get server status
         for sock in readList:
@@ -220,29 +230,39 @@ def addSavedServers(flag: bool = True):
         return getServersFromDB()
 
 
-def updateDB(servers: list[Server]):
-    if not servers:
-        return
+def getTimes(servers: list[Server]) -> list[int]:
+    '''
+    returns an iterator of air times
+    '''
     airTimeList = []
     for host, port in [(server.host, server.port) for server in servers]:
         cur.execute(
             """
-            SELECT airtime FROM serverData
+            SELECT airTime FROM serverData
             WHERE host = ? AND port = ?
             """,
             (host, port) 
         )
-        airTime = cur.fetchone()[0]
+        try:
+            airTime = cur.fetchone()[0]
+        except TypeError:
+            airTime = None
         if not airTime:
             airTimeList.append(0)
             continue
         airTimeList.append(int(float(airTime)))
 
-    airTimeList = iter(airTimeList)
+    return iter(airTimeList)
+
+def updateDB(servers: list[Server]):
+    if not servers:
+        return
+    
+    airTimeList = getTimes(servers)
     cur.executemany(
         """
         UPDATE serverData
-        SET connectionsCount = ?, airtime = ?, lastConnected = ?, lastCrashed = ?
+        SET connectionsCount = ?, airTime = ?, lastConnected = ?, lastCrashed = ?
         WHERE host = ? AND port = ?
         """,
         [(server.clientCount, next(airTimeList) + int(time.time() - server.lastCheckedTime), server.lastRequestTime, server.lastCrashTime, server.host, server.port) for server in servers]
@@ -283,28 +303,30 @@ def initDB():
         CREATE TABLE IF NOT EXISTS serverData (
             host TEXT,
             port INTEGER,
-            connectionsCount INTEGER,
-            airtime TEXT,
-            lastConnected TEXT,
-            lastCrashed TEXT,
+            connectionsCount INTEGER DEFAULT 0,
+            airTime TEXT DEFAULT 0,
+            lastConnected TEXT DEFAULT 'N/A',
+            lastCrashed TEXT DEFAULT 'N/A',
             UNIQUE(host, port)
         )
         """
     )
     con.commit()
 
-def runProxy():
+
+def runProxy(servers: list[Server] = [], allowInput: bool = False):
     initDB()
-    communicationList = initServersInput(addSavedServersInput())
+    if allowInput:
+        servers = initServersInput(addSavedServersInput())
     proxySocket = initProxy()
 
     proxySocket.listen(BACKLOG)
     logger.info(f"Server listening on port {PORT}...")
-    lookForClients(communicationList, proxySocket,)
+    lookForClients(servers, proxySocket, allowInput)
 
 
 def main():
-    runProxy()
+    runProxy([], True)
 
 
 if __name__ == "__main__":
