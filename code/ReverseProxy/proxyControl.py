@@ -2,7 +2,6 @@
 # add configuration
 # read from file
 
-
 import flet as ft
 from connectionObjects import Server
 import proxyServer
@@ -22,73 +21,30 @@ SMALL_TEXT_STYLE = ft.TextStyle(size=14, color=color_text, font_family="Poppins"
 loadFrom = "database"
 
 def main(page: ft.Page) -> None:
-    servers = proxyServer.initServers(proxyServer.addSavedServers() if loadFrom == "database" else None)
-    proxyThread = Thread(target=proxyServer.runProxy, args=(servers,))
-    proxyThread.start()
+    servers_lock = Lock()
+    servers = []
 
-    page.title = "ReverseProxy Control Panel"
-    page.theme_mode = ft.ThemeMode.DARK
-    page.window_width = 950
-    page.window_height = 600
-    page.bgcolor = color_background
-
-    mainContent = ft.Container(expand=True)
-    serverIp = ft.TextField(label="Server IP", border_color=color_tertiary, width=230, max_length=proxyServer.MAX_HOST_LENGTH)
-    serverPort = ft.TextField(label="Server Port", border_color=color_tertiary, width=230, max_length=proxyServer.MAX_PORT_LENGTH)
-
-    loadBalancingMethod = ft.Dropdown(
-        label="Load Balancing Method",
-        options=[
-            ft.dropdown.Option(key="roundRobin", text="Round Robin"),
-            ft.dropdown.Option(key="leastConnections", text="Least Connections"),
-            ft.dropdown.Option(key="random", text="Random"),
-            ft.dropdown.Option(key="IP Hashing", text="IP Hashing"),
-        ],
-        border_color=color_tertiary,
-        width=230
-    )
-
-    chooseServerBy = ft.RadioGroup(content=ft.Column([
-        ft.Radio(value="time", label = "By Time", label_style=SUBTITLE_TEXT_STYLE),
-        ft.Radio(value="client", label = "By Client", label_style=SUBTITLE_TEXT_STYLE)
-    ]))
-
-    timeInterval = ft.TextField(label="Time Interval (in seconds)", border_color=color_tertiary, width=230)
-
-    loadServersFrom = ft.RadioGroup(content=ft.Column([
-        ft.Radio(value="database", label = "Last Saved Servers", label_style=SUBTITLE_TEXT_STYLE),
-        ft.Radio(value="file", label = "Default Servers (in config.json)", label_style=SUBTITLE_TEXT_STYLE)
-    ]))
-
-    navigation = ft.Container(
-        width=255,
-        bgcolor=color_new,
-        content=ft.Column(
-            expand=True,
-            controls=[
-                ft.Text("Navigation", style="headlineMedium", color=color_text),
-                ft.ElevatedButton(text="Dashboard", color=color_text, bgcolor=color_secondary, on_click=lambda e:showView(dashboardView)),
-                ft.ElevatedButton(text="Server Management", color=color_text, bgcolor=color_secondary, on_click=lambda e:showView(serverManagementView)),
-                ft.ElevatedButton(text="Configuration", color=color_text, bgcolor=color_secondary, on_click=lambda e:showView(configurationView)),
-                ft.ElevatedButton(text="Server Properties Log", color=color_text, bgcolor=color_secondary, on_click=lambda e:showView(serverPropertiesDataLogView)),
-            ],
-            spacing=10
-        )
-    )
+    def load_servers():
+        nonlocal servers
+        with servers_lock:
+            servers = proxyServer.initServers(proxyServer.addSavedServers() if loadFrom == "database" else None)
+        proxyThread = Thread(target=proxyServer.runProxy, args=(servers,))
+        proxyThread.start()
 
     def serverList():
-        return ft.ListView(
-            [
-                ft.ListTile(
-                    leading=ft.Icon(ft.icons.STORAGE, color=color_text),
-                    subtitle=ft.Text(f"IP: {server.host}, Port: {server.port}, Status: UP", style=SUBTITLE_TEXT_STYLE),
-                    data=server
-                )
-                for server in servers
-            ],
-            expand=True
-        )
-    
+        with servers_lock:
+            return ft.ListView(
+                [
+                    ft.ListTile(
+                        leading=ft.Icon(ft.icons.STORAGE, color=color_text),
+                        subtitle=ft.Text(f"IP: {server.host}, Port: {server.port}, Status: UP", style=SUBTITLE_TEXT_STYLE),
+                        data=server
+                    )
+                    for server in servers
+                ],
+                expand=True
+            )
+
     def dashboardView():
         return ft.Container(
             bgcolor=color_secondary,
@@ -104,20 +60,20 @@ def main(page: ft.Page) -> None:
                 ]
             )
         )
-    
 
     def addServer(e):
         nonlocal servers
-        serverProps = serverPort.value + " " + serverIp.value
+        serverProps = f"{serverIp.value} {serverPort.value}"
         if list(proxyServer.checkServerProps(serverProps)):
-            servers = proxyServer.addServers(serverProps, servers)
+            with servers_lock:
+                servers = proxyServer.addServers(serverProps, servers)
+                proxyServer.proxyLoadBalancer.updateServerList(servers)
             page.snack_bar = ft.SnackBar(content=ft.Text(f"Server added!", style=SUBTITLE_TEXT_STYLE), open=True, bgcolor=color_tertiary)
         else:
-            page.snack_bar = ft.SnackBar(content=ft.Text(f"invalid server arguments", style=SUBTITLE_TEXT_STYLE), open=True, bgcolor=color_tertiary)
+            page.snack_bar = ft.SnackBar(content=ft.Text(f"Invalid server arguments", style=SUBTITLE_TEXT_STYLE), open=True, bgcolor=color_tertiary)
         serverIp.value = ""
         serverPort.value = ""
         showView(serverManagementView)
-    
 
     def serverManagementView():
         return ft.Container(
@@ -141,14 +97,13 @@ def main(page: ft.Page) -> None:
             )
         )
 
-
     def saveConfig(e):
+        global loadFrom
         method = loadBalancingMethod.value
         chosenBy = chooseServerBy.value
         loadFrom = loadServersFrom.value
-        coosheTime = timeInterval.value
+        chooseTime = timeInterval.value
         page.snack_bar = ft.SnackBar(ft.Text(f"Configuration saved!", style=SUBTITLE_TEXT_STYLE), open=True, bgcolor=color_tertiary)
-
 
     def configurationView():
         return ft.Container(
@@ -179,28 +134,25 @@ def main(page: ft.Page) -> None:
                             ft.TextField(value=proxyServer.PORT, text_style=SUBTITLE_TEXT_STYLE, width=230)
                         ],
                     ),
-
                     ft.Row(
                         controls=[
                             ft.Text('Buffer size: ', style=SUBTITLE_TEXT_STYLE, width=100),
                             ft.TextField(value=proxyServer.BUFFER_SIZE, text_style=SUBTITLE_TEXT_STYLE, width=230)
                         ],
                     ),
-
                     ft.Row(
                         controls=[
                             ft.Text('Backlog: ', style=SUBTITLE_TEXT_STYLE, width=100),
                             ft.TextField(value=proxyServer.BACKLOG, text_style=SUBTITLE_TEXT_STYLE, width=230)
                         ],
                     ),
-
                     ft.ElevatedButton("Save Configuration", on_click=saveConfig, color=color_text, bgcolor=color_tertiary),
                     # Add more configuration elements here...
                 ],
                 scroll="auto"
             )
         )
-    
+
     def serverPropertiesDataLogView():
         airTimeList = proxyServer.getTimes(servers)
         table = ft.DataTable(
@@ -218,7 +170,7 @@ def main(page: ft.Page) -> None:
                         ft.DataCell(ft.Text(server.host, style=SMALL_TEXT_STYLE)),
                         ft.DataCell(ft.Text(server.port, style=SMALL_TEXT_STYLE)),
                         ft.DataCell(ft.Text(server.clientCount, style=SMALL_TEXT_STYLE)),
-                        ft.DataCell(ft.Text(next(airTimeList) + int(proxyServer.time.time() - server.lastCheckedTime), style=SMALL_TEXT_STYLE)),
+                        ft.DataCell(ft.Text(next(airTimeList) + int(time.time() - server.lastCheckedTime), style=SMALL_TEXT_STYLE)),
                         ft.DataCell(ft.Text(server.lastRequestTime, style=SMALL_TEXT_STYLE)),
                         ft.DataCell(ft.Text(server.lastCrashTime, style=SMALL_TEXT_STYLE)),
                     ]
@@ -246,11 +198,63 @@ def main(page: ft.Page) -> None:
     def checkServersAlive():
         nonlocal servers
         while True:
-            if not servers:
-                print("no servers found")
-                page.snack_bar = ft.SnackBar(ft.Text(f"*** ALL SERVERS ARE DOWN, PLEASE CHOOSE NEW SERVERS ***", style=SUBTITLE_TEXT_STYLE), open=True, bgcolor=color_tertiary)
-            proxyServer.time.sleep(10)
-    
+            with servers_lock:
+                if not servers:
+                    print("no servers found")
+                    page.snack_bar = ft.SnackBar(ft.Text(f"*** ALL SERVERS ARE DOWN, PLEASE CHOOSE NEW SERVERS ***", style=SUBTITLE_TEXT_STYLE), open=True, bgcolor=color_tertiary)
+            time.sleep(10)
+
+    load_servers()
+    page.title = "ReverseProxy Control Panel"
+    page.theme_mode = ft.ThemeMode.DARK
+    page.window_width = 950
+    page.window_height = 600
+    page.bgcolor = color_background
+
+    mainContent = ft.Container(expand=True)
+    serverIp = ft.TextField(label="Server IP", border_color=color_tertiary, width=230, max_length=proxyServer.MAX_HOST_LENGTH)
+    serverPort = ft.TextField(label="Server Port", border_color=color_tertiary, width=230, max_length=proxyServer.MAX_PORT_LENGTH)
+
+    loadBalancingMethod = ft.Dropdown(
+        label="Load Balancing Method",
+        options=[
+            ft.dropdown.Option(key="roundRobin", text="Round Robin"),
+            ft.dropdown.Option(key="leastConnections", text="Least Connections"),
+            ft.dropdown.Option(key="random", text="Random"),
+            ft.dropdown.Option(key="IP Hashing", text="IP Hashing"),
+        ],
+        border_color=color_tertiary,
+        width=230
+    )
+
+    chooseServerBy = ft.RadioGroup(content=ft.Column([
+        ft.Radio(value="time", label="By Time", label_style=SUBTITLE_TEXT_STYLE),
+        ft.Radio(value="client", label="By Client", label_style=SUBTITLE_TEXT_STYLE)
+    ]))
+
+    timeInterval = ft.TextField(label="Time Interval (in seconds)", border_color=color_tertiary, width=230)
+
+    loadServersFrom = ft.RadioGroup(content=ft.Column([
+        ft.Radio(value="database", label="Last Saved Servers", label_style=SUBTITLE_TEXT_STYLE),
+        ft.Radio(value="file", label="Default Servers (in config.json)", label_style=SUBTITLE_TEXT_STYLE)
+    ]))
+
+    navigation = ft.Container(
+        width=255,
+        bgcolor=color_new,
+        content=ft.Column(
+            expand=True,
+            controls=[
+                ft.Text("Navigation", style="headlineMedium", color=color_text),
+                ft.ElevatedButton(text="Dashboard", color=color_text, bgcolor=color_secondary, on_click=lambda e: showView(dashboardView)),
+                ft.ElevatedButton(text="Server Management", color=color_text, bgcolor=color_secondary, on_click=lambda e: showView(serverManagementView)),
+                ft.ElevatedButton(text="Configuration", color=color_text, bgcolor=color_secondary, on_click=lambda e: showView(configurationView)),
+                ft.ElevatedButton(text="Server Properties Log", color=color_text, bgcolor=color_secondary, on_click=lambda e: showView(serverPropertiesDataLogView)),
+            ],
+            spacing=10
+        )
+    )
+
     showView(dashboardView)
 
     page.add(

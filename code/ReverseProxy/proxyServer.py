@@ -13,8 +13,12 @@ import hashlib
 import sqlite3
 
 # user configuration
+method = "roundRobin"
+chosenBy = "time"
+loadFrom = "database"
+coosheTime = 1
 useIPHashing = True
-chooseServerByTime = True  # every set amount of time or choose server for each client
+chosenBy = True  # every set amount of time or choose server for each client
 
 
 HOST = '0.0.0.0'
@@ -112,7 +116,7 @@ class LoadBalancer:
     def random(self) -> Server:
         return self.servers[random.randint(0, len(self.servers) - 1)]
 
-
+proxyLoadBalancer = LoadBalancer([], True if __name__ == "__main__" else False)
 
 def initProxy() -> socket.socket:
     proxySocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -166,8 +170,8 @@ def initServers(communicationList: list[Server] = []) -> list[Server]:
 
 
 def lookForClients(communicationList: list[Server], proxySocket: socket.socket, allowInput: bool = False):
-    proxyLoadBalancer = LoadBalancer(communicationList, allowInput)
-    timeLoopThread = Thread(target=chooseServerByTimeLoop, args=(proxyLoadBalancer,))
+    proxyLoadBalancer.updateServerList(communicationList)
+    timeLoopThread = Thread(target=chosenByLoop, args=(proxyLoadBalancer,))
     timeLoopThread.start()
 
     while True:
@@ -194,9 +198,9 @@ def getNewClient(proxySocket: socket.socket, proxyLoadBalancer: LoadBalancer):
     clientSocket, clientAddress = proxySocket.accept()
     newClient = Client(*clientAddress, clientSocket)
     logger.debug(f"New Client Joined: {newClient.name}")
-    if chooseServerByTime:
+    if chosenBy:
         pass
-    elif useIPHashing:
+    elif method == "IPHashing":
         chosenServer = proxyLoadBalancer.getServerForClient(newClient)
     else:
         chosenServer = proxyLoadBalancer.chooseServer("roundRobin")
@@ -289,10 +293,10 @@ def updateDataFromDB(servers: list[Server]):
 
 
 
-def chooseServerByTimeLoop(proxyLoadBalancer: LoadBalancer):
+def chosenByLoop(proxyLoadBalancer: LoadBalancer):
     global chosenServer
     
-    while chooseServerByTime:
+    while chosenBy:
         chosenServer = proxyLoadBalancer.chooseServer()
         time.sleep(TIME_INTERVAL)
 
