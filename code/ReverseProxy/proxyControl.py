@@ -1,12 +1,13 @@
 # TODO:
-# add configureation
+# add configuration
 # read from file
 
 
 import flet as ft
 from connectionObjects import Server
 import proxyServer
-from threading import Thread
+from threading import Thread, Lock
+import time
 
 # Color palette
 color_text = "#DFF5FF"
