@@ -11,14 +11,15 @@ from utils import checkServerProps
 from connectionObjects import Server, Client
 import hashlib
 import sqlite3
+import json
+import os
 
 # user configuration
+### will be rewritten in this code ###
 method = "roundRobin"
 chosenBy = "time"
 loadFrom = "database"
-coosheTime = 1
-useIPHashing = True
-chosenBy = True  # every set amount of time or choose server for each client
+chooseTime = 1  # every set amount of time or choose server for each client
 
 
 HOST = '0.0.0.0'
@@ -28,8 +29,15 @@ MAX_PORT_LENGTH = 5
 BUFFER_SIZE = 1024
 BACKLOG = 10
 ERROR = "error"
-TIME_INTERVAL = 1
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+SERVERS_FILE_PATH = 'servers.txt'
+CONFIG_FILE_PATH = 'config.json'
+DEFAULT_CONFIG = {
+    "method": "roundRobin",
+    "chosenBy": "time",
+    "loadFrom": "database",
+    "chooseTime": 1
+}
 
 
 con = sqlite3.connect("serverData.db", check_same_thread=False)
@@ -72,9 +80,10 @@ class LoadBalancer:
         else:
             logger.error(f"Invalid method: {method}, defaulting to 'roundRobin'")
             server = self.roundRobin()
-        
+
         updateDB(self.servers)
         if server.runThread:
+            logger.debug(f"Chosen Server: {server.name}, method: {method}")
             return server
         self.servers.remove(server)
         self.chooseServer(method)
@@ -140,8 +149,6 @@ def initServersInput(communicationList: list[Server] = []) -> list[Server]:
         initServersInput(communicationList)
     return communicationList
 
-        
-
 
 def addServers(serverProps: str, communicationList: list[Server] = []) -> list[Server]:
     updateDB(communicationList)
@@ -171,7 +178,6 @@ def initServers(communicationList: list[Server] = []) -> list[Server]:
 
 def lookForClients(communicationList: list[Server], proxySocket: socket.socket, allowInput: bool = False):
     proxyLoadBalancer.updateServerList(communicationList)
-    timeLoopThread = Thread(target=chosenByLoop, args=(proxyLoadBalancer,))
     timeLoopThread.start()
 
     while True:
@@ -198,12 +204,17 @@ def getNewClient(proxySocket: socket.socket, proxyLoadBalancer: LoadBalancer):
     clientSocket, clientAddress = proxySocket.accept()
     newClient = Client(*clientAddress, clientSocket)
     logger.debug(f"New Client Joined: {newClient.name}")
-    if chosenBy:
-        pass
-    elif method == "IPHashing":
+    
+    if method == "IPHashing":
         chosenServer = proxyLoadBalancer.getServerForClient(newClient)
+    elif chosenBy == "time":
+        try:
+            timeLoopThread.start()
+        except RuntimeError as e:
+            pass
     else:
-        chosenServer = proxyLoadBalancer.chooseServer("roundRobin")
+        logger.debug(f"Choose Server By: client {chosenBy}")
+        chosenServer = proxyLoadBalancer.chooseServer(method)
 
     if chosenServer is None:
         logger.error("No valid server available to handle the new client.")
@@ -296,10 +307,49 @@ def updateDataFromDB(servers: list[Server]):
 def chosenByLoop(proxyLoadBalancer: LoadBalancer):
     global chosenServer
     
-    while chosenBy:
-        chosenServer = proxyLoadBalancer.chooseServer()
-        time.sleep(TIME_INTERVAL)
+    while chosenBy == "time" and method != "IPHashing":
+        print("working")
+        chosenServer = proxyLoadBalancer.chooseServer(method)
+        time.sleep(chooseTime)
+    print("done")
 
+
+def readConfigFile():
+    if not os.path.exists(CONFIG_FILE_PATH):
+        with open(CONFIG_FILE_PATH, 'w') as file:
+            json.dump(DEFAULT_CONFIG, file, indent=4)
+        logger.debug(f"Config file created at {CONFIG_FILE_PATH}")
+        return DEFAULT_CONFIG['method'], DEFAULT_CONFIG['chosenBy'], DEFAULT_CONFIG['loadFrom'], DEFAULT_CONFIG['chooseTime']
+
+    with open(CONFIG_FILE_PATH, 'r') as file:
+        config = json.load(file)
+        method = config.get('method', 'roundRobin')
+        chosenBy = config.get('chosenBy', 'time')
+        loadFrom = config.get('loadFrom', 'database')
+        chooseTime = config.get('chooseTime', 1)
+    logger.debug(f"Config: {method}, {chosenBy}, {loadFrom}, {chooseTime}")
+    return method, chosenBy, loadFrom, chooseTime
+
+method, chosenBy, loadFrom, chooseTime = readConfigFile()
+def writeConfigFile(method, chosenBy, loadFrom, chooseTime):
+    config = {
+        "method": method,
+        "chosenBy": chosenBy,
+        "loadFrom": loadFrom,
+        "chooseTime": chooseTime
+    }
+    with open(CONFIG_FILE_PATH, 'w') as file:
+        json.dump(config, file, indent=4)
+
+def readServersFile():
+    if not os.path.exists(SERVERS_FILE_PATH):
+        with open(SERVERS_FILE_PATH, 'x') as file:
+            pass
+        return []
+    with open(SERVERS_FILE_PATH, 'r') as file:
+        servers = addServers(file.read())
+    logger.debug(f"Servers from file: {servers}")
+    return servers
 
 def initDB():
     cur.execute(
@@ -317,7 +367,7 @@ def initDB():
     )
     con.commit()
 
-
+timeLoopThread = Thread(target=chosenByLoop, args=(proxyLoadBalancer,))
 def runProxy(servers: list[Server] = [], allowInput: bool = False):
     initDB()
     if allowInput:

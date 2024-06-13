@@ -1,0 +1,6 @@
+{
+    "method": "roundRobin",
+    "chosenBy": "time",
+    "loadFrom": "database",
+    "chooseTime": 1
+}

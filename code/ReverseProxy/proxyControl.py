@@ -18,16 +18,14 @@ color_background = "#494CEF"
 SUBTITLE_TEXT_STYLE = ft.TextStyle(size=20, color=color_text)
 SMALL_TEXT_STYLE = ft.TextStyle(size=14, color=color_text, font_family="Poppins")
 
-loadFrom = "database"
-
 def main(page: ft.Page) -> None:
     servers_lock = Lock()
     servers = []
 
-    def load_servers():
+    def loadServers():
         nonlocal servers
         with servers_lock:
-            servers = proxyServer.initServers(proxyServer.addSavedServers() if loadFrom == "database" else None)
+            servers = proxyServer.initServers(proxyServer.addSavedServers() if proxyServer.loadFrom == "database" else proxyServer.readServersFile())
         proxyThread = Thread(target=proxyServer.runProxy, args=(servers,))
         proxyThread.start()
 
@@ -98,12 +96,35 @@ def main(page: ft.Page) -> None:
         )
 
     def saveConfig(e):
-        global loadFrom
-        method = loadBalancingMethod.value
-        chosenBy = chooseServerBy.value
-        loadFrom = loadServersFrom.value
-        chooseTime = timeInterval.value
+        ret = False
+        if not loadBalancingMethod.value:
+            page.snack_bar = ft.SnackBar(ft.Text(f"Please choose a load balancing method!", style=SUBTITLE_TEXT_STYLE), open=True, bgcolor=color_tertiary)
+            ret = True
+        if not chooseServerBy.value:
+            page.snack_bar = ft.SnackBar(ft.Text(f"Please choose a server choosing method!", style=SUBTITLE_TEXT_STYLE), open=True, bgcolor=color_tertiary)
+            ret = True
+        if not loadServersFrom.value:
+            page.snack_bar = ft.SnackBar(ft.Text(f"Please choose a server loading method!", style=SUBTITLE_TEXT_STYLE), open=True, bgcolor=color_tertiary)
+            ret = True
+        if not timeInterval.value:
+            page.snack_bar = ft.SnackBar(ft.Text(f"Please choose a time interval!", style=SUBTITLE_TEXT_STYLE), open=True, bgcolor=color_tertiary)
+            ret = True
+        try:
+            int(timeInterval.value)
+        except ValueError:
+            page.snack_bar = ft.SnackBar(ft.Text(f"Please choose a valid time interval!", style=SUBTITLE_TEXT_STYLE), open=True, bgcolor=color_tertiary)
+            ret = True
+        if ret:
+            page.update()
+            return
+        proxyServer.method = loadBalancingMethod.value
+        proxyServer.chosenBy = chooseServerBy.value
+        proxyServer.loadFrom = loadServersFrom.value
+        proxyServer.chooseTime = int(timeInterval.value)
+        proxyServer.logger.debug(f"Saved configuration: {proxyServer.method}, {proxyServer.chosenBy}, {proxyServer.loadFrom}, {proxyServer.chooseTime}")
         page.snack_bar = ft.SnackBar(ft.Text(f"Configuration saved!", style=SUBTITLE_TEXT_STYLE), open=True, bgcolor=color_tertiary)
+        page.update()
+        proxyServer.writeConfigFile(proxyServer.method, proxyServer.chosenBy, proxyServer.loadFrom, proxyServer.chooseTime)
 
     def configurationView():
         return ft.Container(
@@ -122,28 +143,30 @@ def main(page: ft.Page) -> None:
                     timeInterval,
                     ft.Text("Load Servers From:", style=SUBTITLE_TEXT_STYLE),
                     loadServersFrom,
+                    ft.Text(height=1),
+                    ft.Text("Proxy Server Porperties", style=SUBTITLE_TEXT_STYLE),
                     ft.Row(
                         controls=[
                             ft.Text('Host: ', style=SUBTITLE_TEXT_STYLE, width=100),
-                            ft.TextField(value=proxyServer.HOST, text_style=SUBTITLE_TEXT_STYLE, width=230)
+                            ft.TextField(value=proxyServer.HOST, text_style=SUBTITLE_TEXT_STYLE, width=230, disabled=True)
                         ],
                     ),
                     ft.Row(
                         controls=[
                             ft.Text('Port: ', style=SUBTITLE_TEXT_STYLE, width=100),
-                            ft.TextField(value=proxyServer.PORT, text_style=SUBTITLE_TEXT_STYLE, width=230)
+                            ft.TextField(value=proxyServer.PORT, text_style=SUBTITLE_TEXT_STYLE, width=230, disabled=True)
                         ],
                     ),
                     ft.Row(
                         controls=[
                             ft.Text('Buffer size: ', style=SUBTITLE_TEXT_STYLE, width=100),
-                            ft.TextField(value=proxyServer.BUFFER_SIZE, text_style=SUBTITLE_TEXT_STYLE, width=230)
+                            ft.TextField(value=proxyServer.BUFFER_SIZE, text_style=SUBTITLE_TEXT_STYLE, width=230, disabled=True)
                         ],
                     ),
                     ft.Row(
                         controls=[
                             ft.Text('Backlog: ', style=SUBTITLE_TEXT_STYLE, width=100),
-                            ft.TextField(value=proxyServer.BACKLOG, text_style=SUBTITLE_TEXT_STYLE, width=230)
+                            ft.TextField(value=proxyServer.BACKLOG, text_style=SUBTITLE_TEXT_STYLE, width=230, disabled=True)
                         ],
                     ),
                     ft.ElevatedButton("Save Configuration", on_click=saveConfig, color=color_text, bgcolor=color_tertiary),
@@ -204,10 +227,10 @@ def main(page: ft.Page) -> None:
                     page.snack_bar = ft.SnackBar(ft.Text(f"*** ALL SERVERS ARE DOWN, PLEASE CHOOSE NEW SERVERS ***", style=SUBTITLE_TEXT_STYLE), open=True, bgcolor=color_tertiary)
             time.sleep(10)
 
-    load_servers()
+    loadServers()
     page.title = "ReverseProxy Control Panel"
     page.theme_mode = ft.ThemeMode.DARK
-    page.window_width = 950
+    page.window_width = 965
     page.window_height = 600
     page.bgcolor = color_background
 
@@ -221,8 +244,9 @@ def main(page: ft.Page) -> None:
             ft.dropdown.Option(key="roundRobin", text="Round Robin"),
             ft.dropdown.Option(key="leastConnections", text="Least Connections"),
             ft.dropdown.Option(key="random", text="Random"),
-            ft.dropdown.Option(key="IP Hashing", text="IP Hashing"),
+            ft.dropdown.Option(key="IPHashing", text="IP Hashing"),
         ],
+        value=proxyServer.method,
         border_color=color_tertiary,
         width=230
     )
@@ -230,14 +254,14 @@ def main(page: ft.Page) -> None:
     chooseServerBy = ft.RadioGroup(content=ft.Column([
         ft.Radio(value="time", label="By Time", label_style=SUBTITLE_TEXT_STYLE),
         ft.Radio(value="client", label="By Client", label_style=SUBTITLE_TEXT_STYLE)
-    ]))
+    ]), value=proxyServer.chosenBy)
 
-    timeInterval = ft.TextField(label="Time Interval (in seconds)", border_color=color_tertiary, width=230)
+    timeInterval = ft.TextField(label="Time Interval (in seconds)", border_color=color_tertiary, width=230, value=proxyServer.chooseTime)
 
     loadServersFrom = ft.RadioGroup(content=ft.Column([
         ft.Radio(value="database", label="Last Saved Servers", label_style=SUBTITLE_TEXT_STYLE),
-        ft.Radio(value="file", label="Default Servers (in config.json)", label_style=SUBTITLE_TEXT_STYLE)
-    ]))
+        ft.Radio(value="file", label="Default Servers (in servers.txt)", label_style=SUBTITLE_TEXT_STYLE)
+    ]), value=proxyServer.loadFrom)
 
     navigation = ft.Container(
         width=255,

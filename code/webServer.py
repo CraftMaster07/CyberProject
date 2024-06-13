@@ -80,6 +80,8 @@ def directoryResponse(request: str) -> str:
     except UnicodeDecodeError:
         with open(f"{DIRECTORY}{reqFilePath}", 'rb') as file:
             response = file.read()
+    except FileNotFoundError:
+        response = HTTP_RESPONSE
 
     contentType = getContentType(request)
     if "image/avif" in contentType:
