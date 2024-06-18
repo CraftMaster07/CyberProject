@@ -53,7 +53,7 @@ def main(page: ft.Page) -> None:
                     ft.Text(" Dashboard", style="headlineMedium", color=color_text),
                     ft.Text("  Server Status:", style=SUBTITLE_TEXT_STYLE),
                     serverList(),
-                    ft.Text(" Load Balancing Method: Round Robin", style=SUBTITLE_TEXT_STYLE),
+                    ft.Text(f" Load Balancing Method: {proxyServer.method}", style=SUBTITLE_TEXT_STYLE),
                     # Add more dashboard elements here...
                 ]
             )

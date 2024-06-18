@@ -1,6 +1,6 @@
 {
-    "method": "roundRobin",
+    "method": "random",
     "chosenBy": "time",
     "loadFrom": "database",
-    "chooseTime": 1
+    "chooseTime": 3
 }
